@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import salud
+from api.routers import campanas, salud
+
 
 app = FastAPI(
     title="BarrioGO API",
@@ -16,4 +17,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(salud.router)
+app.include_router(campanas.router)
+
