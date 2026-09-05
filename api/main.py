@@ -18,4 +18,4 @@ app.add_middleware(
 )
 
 app.include_router(campanas.router)
-
+app.include_router(salud.router)
