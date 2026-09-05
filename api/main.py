@@ -5,9 +5,10 @@ from api.routers import campanas, salud
 
 
 app = FastAPI(
-    title="BarrioGO API",
+    title="ZoneGo API",
     version="0.1.0",
 )
+
 
 app.add_middleware(
     CORSMiddleware,
