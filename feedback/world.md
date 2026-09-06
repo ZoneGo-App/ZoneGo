@@ -1,40 +1,44 @@
-# Feedback para World — Selfie Check
+# Feedback for World — Selfie Check
 
-Documento vivo. Cada uno anota el mismo día que le pasa, no de memoria al final.
-Instrucción de Mateo Sauton en el taller: "no sean amables".
+Living document. Each of us writes on the same day it happens, not from memory at the end.
+Mateo Sauton, in the ETHOnline workshop: *"don't be nice."*
 
-## Qué integramos
+## What we integrated
 
-(pendiente)
+_(pending)_
 
-## Feedback de desarrollador
+## Developer feedback
 
-### Lo que funcionó bien
+### What worked well
 
-### Lo que costó más de lo que debería
+### What took longer than it should have
 
-### Documentación: qué faltaba o estaba mal
+### Documentation: what was missing or wrong
 
-### Errores encontrados
+### Bugs we hit
 
-| Fecha | Qué hicimos | Qué esperábamos | Qué pasó |
+| Date | What we did | What we expected | What happened |
 |---|---|---|---|
 | | | | |
 
-## Feedback de usuario
+## User feedback
 
-### Cómo se sintió el flujo de verificación
+### How the verification flow felt
 
-### Dónde dudó o se trabó alguien probándolo
+### Where someone hesitated or got stuck while testing
 
-### Cuánto tarda en segundos
+### How long it takes, in seconds
 
-## Lo que nos faltó
+## What we wished existed
 
-### Qué nos habría gustado que existiera
+## On the 90-day expiry
 
-## Sobre la caducidad de 90 días
+Mateo confirmed Selfie Check verification is not permanent — it caps at 90 days.
+What that meant for our design:
 
-(Mateo confirmó que la verificación no es permanente. Qué implicó para nuestro diseño.)
+_(pending)_
 
 ---
+
+**Authors:** Lucio, Sebastián, Edmer, David
+**World contact:** MrSauron (Discord)

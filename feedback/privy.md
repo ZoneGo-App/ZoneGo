@@ -1,29 +1,35 @@
-# Feedback para Privy
+# Feedback for Privy
 
-Documento vivo. Se anota el mismo día.
+Living document. Written the same day it happens.
 
-## Qué integramos
-(billeteras embebidas, de organización, políticas de transferencia)
+## What we integrated
 
-## Lo que funcionó bien
+_(embedded wallets, organization wallets, transfer policies)_
 
-## Lo que costó
+## What worked well
 
-## Documentación
+## What took longer than it should have
 
-### Errores ya reportados por otros
-- `docs.privy.io/recipes/send-usdc` tiene enlaces rotos hacia el sitio de
-  Circle con las direcciones de USDC, de mainnet y de testnet.
-  Reportado por otro participante el 4/9 en el canal de Discord.
+## Documentation
 
-### Errores que encontramos nosotros
+### Issues already reported by others
 
-| Fecha | Qué hicimos | Qué esperábamos | Qué pasó |
+- `docs.privy.io/recipes/send-usdc` has broken links to Circle's site for the
+  USDC addresses, on both mainnet and testnets. Reported by another participant
+  on Sept 4 in the ETHOnline Discord channel.
+
+### Issues we found ourselves
+
+| Date | What we did | What we expected | What happened |
 |---|---|---|---|
 | | | | |
 
-## Cómo Privy mejora el producto
-(requisito explícito de los dos premios)
+## How Privy improves the product
+
+Both prizes ask for this explicitly.
+
+_(pending)_
 
 ---
-**Contacto:** @Coby | Privy (Discord)
+
+**Privy contact:** @Coby | Privy (Discord)
