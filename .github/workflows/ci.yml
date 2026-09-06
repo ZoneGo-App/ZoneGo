@@ -12,8 +12,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Instalar dependencias
+      - name: Install dependencies
         run: pip install -r api/requirements.txt
 
-      - name: Correr tests
+      - name: Run tests
         run: pytest -q
