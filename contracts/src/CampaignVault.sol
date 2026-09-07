@@ -22,7 +22,7 @@ contract CampaignVault {
     mapping(uint256 => Campaign) public campaigns;
     uint256 public nextCampaignId = 1;
 
-    event CampaignCreated(uint256 indexed campaignId, address indexed merchant, uint256 rewardPerVisit, uint256 dailyCap);
+    event CampaignCreated(uint256 indexed campaignId, address indexed merchant, uint256 rewardPerVisit, uint256 dailyCap, bytes32 geohash, uint256 radius);
     event CampaignFunded(uint256 indexed campaignId, address indexed merchant, uint256 amount);
     event CampaignWithdrawn(uint256 indexed campaignId, address indexed merchant, uint256 amount);
 
@@ -49,7 +49,7 @@ contract CampaignVault {
             radius: radius,
             balance: 0
         });
-        emit CampaignCreated(campaignId, msg.sender, rewardPerVisit, dailyCap);
+        emit CampaignCreated(campaignId, msg.sender, rewardPerVisit, dailyCap, geohash, radius);
     }
 
     function fund(uint256 campaignId, uint256 amount) external {
