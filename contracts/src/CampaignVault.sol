@@ -8,6 +8,7 @@ contract CampaignVault {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable USDC;
+    address public visitRegistry;
 
     struct Campaign {
         address merchant;
@@ -27,6 +28,12 @@ contract CampaignVault {
 
     constructor(address _usdc) {
         USDC = IERC20(_usdc);
+    }
+
+    function setVisitRegistry(address _visitRegistry) external {
+        require(_visitRegistry != address(0), "zero address");
+        require(visitRegistry == address(0), "already set");
+        visitRegistry = _visitRegistry;
     }
 
     function createCampaign(uint256 rewardPerVisit, uint256 dailyCap, bytes32 geohash, uint256 radius)
@@ -62,5 +69,13 @@ contract CampaignVault {
         c.balance = 0;
         USDC.safeTransfer(msg.sender, amount);
         emit CampaignWithdrawn(campaignId, msg.sender, amount);
+    }
+
+    function payReward(uint256 campaignId, address to, uint256 amount) external {
+        require(msg.sender == visitRegistry, "not registry");
+        Campaign storage c = campaigns[campaignId];
+        require(c.balance >= amount, "insufficient balance");
+        c.balance -= amount;
+        USDC.safeTransfer(to, amount);
     }
 }

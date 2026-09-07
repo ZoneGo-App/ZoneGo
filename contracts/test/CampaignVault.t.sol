@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {CampaignVault} from "../src/CampaignVault.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MockUSDC is ERC20 {
@@ -21,6 +20,7 @@ contract CampaignVaultTest is Test {
     function setUp() public {
         usdc = new MockUSDC();
         vault = new CampaignVault(address(usdc));
+        usdc.transfer(merchant, 100e6);
     }
 
     function test_FundNonexistentCampaignReverts() public {
@@ -35,5 +35,34 @@ contract CampaignVaultTest is Test {
         vm.prank(stranger);
         vm.expectRevert("not merchant");
         vault.withdraw(campaignId);
+    }
+
+    function test_CreateCampaignSucceeds() public {
+        vm.prank(merchant);
+        uint256 campaignId = vault.createCampaign(1e6, 10e6, bytes32(0), 1000);
+
+        (address m, uint256 rewardPerVisit, uint256 dailyCap,,, uint256 balance) = vault.campaigns(campaignId);
+        assertEq(m, merchant);
+        assertEq(rewardPerVisit, 1e6);
+        assertEq(dailyCap, 10e6);
+        assertEq(balance, 0);
+    }
+
+    function test_FundAndWithdrawSucceeds() public {
+        vm.startPrank(merchant);
+        uint256 campaignId = vault.createCampaign(1e6, 10e6, bytes32(0), 1000);
+        usdc.approve(address(vault), 100e6);
+        vault.fund(campaignId, 100e6);
+
+        (,,,,, uint256 balanceAfterFund) = vault.campaigns(campaignId);
+        assertEq(balanceAfterFund, 100e6);
+
+        uint256 merchantBalanceBefore = usdc.balanceOf(merchant);
+        vault.withdraw(campaignId);
+        vm.stopPrank();
+
+        (,,,,, uint256 balanceAfterWithdraw) = vault.campaigns(campaignId);
+        assertEq(balanceAfterWithdraw, 0);
+        assertEq(usdc.balanceOf(merchant), merchantBalanceBefore + 100e6);
     }
 }
