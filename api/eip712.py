@@ -17,7 +17,6 @@ import time
 # builder change — callers stay the same.
 VISIT_TYPE = [
     {"name": "campaignId", "type": "uint256"},
-    {"name": "visitor", "type": "address"},
     {"name": "nonce", "type": "uint256"},
     {"name": "expiry", "type": "uint64"},
     {"name": "geohash", "type": "string"},
@@ -32,7 +31,6 @@ def new_nonce() -> int:
 def build_payload(
     *,
     campaign_id: int,
-    visitor: str,
     geohash: str,
     chain_id: int,
     verifying_contract: str,
@@ -61,7 +59,6 @@ def build_payload(
         },
         "message": {
             "campaignId": campaign_id,
-            "visitor": visitor,
             "nonce": nonce,
             "expiry": expiry,
             "geohash": geohash,
