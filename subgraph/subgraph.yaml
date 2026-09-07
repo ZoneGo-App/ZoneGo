@@ -1,0 +1,83 @@
+specVersion: 1.0.0
+description: Verified physical store visits, rewards and fraud epochs for ZoneGo.
+repository: https://github.com/ZoneGo-App/ZoneGo
+schema:
+  file: ./schema.graphql
+
+dataSources:
+  # Addresses are placeholders until Sebastian deploys. Everything else —
+  # schema, handlers, codegen, build — is already exercised without them, so
+  # going live is a matter of pasting three addresses and one start block.
+  - kind: ethereum
+    name: CampaignVault
+    network: base-sepolia
+    source:
+      abi: CampaignVault
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/campaign-vault.ts
+      entities:
+        - Campaign
+        - Merchant
+      abis:
+        - name: CampaignVault
+          file: ./abis/CampaignVault.json
+      eventHandlers:
+        # TODO: CampaignCreated goes here once the contract emits it. Without
+        # it a campaign is only discovered when it is first funded, so reward,
+        # cap, radius and geohash stay unknown to the index.
+        - event: CampaignFunded(indexed uint256,indexed address,uint256)
+          handler: handleCampaignFunded
+
+  - kind: ethereum
+    name: VisitRegistry
+    network: base-sepolia
+    source:
+      abi: VisitRegistry
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/visit-registry.ts
+      entities:
+        - Visit
+        - Reward
+        - Visitor
+        - Merchant
+        - Campaign
+        - CampaignHour
+      abis:
+        - name: VisitRegistry
+          file: ./abis/VisitRegistry.json
+      eventHandlers:
+        - event: VisitRecorded(indexed uint256,indexed address,bytes32,uint64,bytes32)
+          handler: handleVisitRecorded
+        - event: RewardPaid(indexed uint256,indexed address,uint256)
+          handler: handleRewardPaid
+
+  - kind: ethereum
+    name: FraudOracle
+    network: base-sepolia
+    source:
+      abi: FraudOracle
+      address: "0x0000000000000000000000000000000000000000"
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/fraud-oracle.ts
+      entities:
+        - Epoch
+      abis:
+        - name: FraudOracle
+          file: ./abis/FraudOracle.json
+      eventHandlers:
+        - event: EpochCommitted(indexed uint64,bytes32)
+          handler: handleEpochCommitted
