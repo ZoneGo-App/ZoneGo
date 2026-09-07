@@ -1,0 +1,26 @@
+# One command to get the API up, for anyone on the team and for a judge
+# cloning the repo:
+#
+#   docker compose up
+#
+# Then http://localhost:8000/docs
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Mock mode by default, so this works before the contracts are deployed.
+      MOCK_MODE: "${MOCK_MODE:-true}"
+      RPC_URL: "${RPC_URL:-}"
+      SUBGRAPH_URL: "${SUBGRAPH_URL:-}"
+      VISIT_REGISTRY_ADDRESS: "${VISIT_REGISTRY_ADDRESS:-0x0000000000000000000000000000000000000000}"
+    volumes:
+      # Live reload while developing. Production builds the image without this.
+      - ./api:/app/api:ro
+    command: >
+      uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
