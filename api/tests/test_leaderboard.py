@@ -38,6 +38,24 @@ def test_limit_is_respected():
     assert len(rows) == 2
 
 
+def test_a_zone_narrows_the_table():
+    everyone = client.get("/leaderboard").json()
+    les = client.get("/leaderboard", params={"zone": "dr5rsk"}).json()
+    assert 0 < len(les) < len(everyone)
+    assert all(r["zone"] == "dr5rsk" for r in les)
+
+
+def test_the_zone_comes_back_with_a_readable_name():
+    rows = client.get("/leaderboard", params={"zone": "dr5rsk"}).json()
+    assert rows[0]["zone_name"] == "Lower East Side"
+
+
+def test_a_zone_that_is_not_a_geohash_is_refused():
+    # 'a', 'i', 'l' and 'o' are not in the geohash alphabet.
+    assert client.get("/leaderboard", params={"zone": "drailo"}).status_code == 422
+    assert client.get("/leaderboard", params={"zone": "dr5r"}).status_code == 422
+
+
 def test_a_broken_subgraph_is_not_an_empty_table(monkeypatch):
     """An empty leaderboard reads as 'nobody played yet'. Very different."""
     monkeypatch.setattr(get_config(), "mock_mode", False)

@@ -44,6 +44,10 @@ class LeaderboardEntry(BaseModel):
     computed without an index of the chain.
     """
     distinct_merchants: int | None = None
+    "Six-character geohash prefix. Null on a city-wide table."
+    zone: str | None = None
+    "What to print for that zone: 'Lower East Side' rather than 'dr5rsk'."
+    zone_name: str | None = None
 
 
 class ScoreRequest(BaseModel):

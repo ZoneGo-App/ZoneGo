@@ -9,8 +9,9 @@ Amounts are USDC minor units — 6 decimals, so 50_000 is five cents.
 
 from datetime import datetime, timedelta, timezone
 
-from api.geo import encode_geohash
+from api.geo import encode_geohash, zone_of
 from api.schemas import Campaign, LeaderboardEntry
+from api.zones import zone_name
 
 NOW = datetime.now(timezone.utc)
 
@@ -69,29 +70,34 @@ CAMPAIGNS = [
 ]
 
 
-def _entry(rank, address, visits, distinct=None) -> LeaderboardEntry:
+def _entry(rank, address, visits, distinct=None, zone=None) -> LeaderboardEntry:
     return LeaderboardEntry(
         rank=rank,
         address=address,
         label=f"{address[:6]}…{address[-4:]}",
         visits=visits,
         distinct_merchants=distinct,
+        zone=zone,
+        zone_name=zone_name(zone) if zone else None,
     )
 
 
 # Seeded so David has a table to build against and the demo has something to
 # show. Explorers are ordered by visits, but the interesting column is how
 # many different stores each one found.
+LES = zone_of(CAMPAIGNS[0].geohash)
+NORTH = zone_of(CAMPAIGNS[2].geohash)
+
 MOCK_EXPLORERS = [
-    _entry(1, "0x7A3c9E1b4D2f5A8c6B0e9F7d3C1a5B8e2D4f6A90", 142, 9),
-    _entry(2, "0x4E8b2C7a1F9d6B3e5A0c8D2f7B4a1E6c9D3f5B70", 97, 5),
-    _entry(3, "0xB1d5F8a3C6e9D2b7A4f0E8c1D5b9F3a6C2e7D480", 88, 11),
-    _entry(4, "0x2F7a9D4c1B8e6A3f5C0d7E2b9A4f1C6d3B8e5A20", 61, 4),
-    _entry(5, "0xC9e4B7a2D5f8C1b6E3a0F9d4B7c2A5e8D1f6C390", 45, 7),
+    _entry(1, "0x7A3c9E1b4D2f5A8c6B0e9F7d3C1a5B8e2D4f6A90", 142, 9, LES),
+    _entry(2, "0x4E8b2C7a1F9d6B3e5A0c8D2f7B4a1E6c9D3f5B70", 97, 5, LES),
+    _entry(3, "0xB1d5F8a3C6e9D2b7A4f0E8c1D5b9F3a6C2e7D480", 88, 11, NORTH),
+    _entry(4, "0x2F7a9D4c1B8e6A3f5C0d7E2b9A4f1C6d3B8e5A20", 61, 4, LES),
+    _entry(5, "0xC9e4B7a2D5f8C1b6E3a0F9d4B7c2A5e8D1f6C390", 45, 7, NORTH),
 ]
 
 MOCK_MERCHANTS = [
-    _entry(1, CAMPAIGNS[0].merchant, 412),
-    _entry(2, CAMPAIGNS[1].merchant, 287),
-    _entry(3, CAMPAIGNS[2].merchant, 203),
+    _entry(1, CAMPAIGNS[0].merchant, 412, zone=LES),
+    _entry(2, CAMPAIGNS[1].merchant, 287, zone=zone_of(CAMPAIGNS[1].geohash)),
+    _entry(3, CAMPAIGNS[2].merchant, 203, zone=NORTH),
 ]
