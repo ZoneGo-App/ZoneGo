@@ -6,7 +6,7 @@ bodega that stocks sneakers shows up for that word even though its category
 says corner store.
 """
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from api.config import get_config
 from api.geo import distance_meters
@@ -40,10 +40,14 @@ def search(
         radius_km = ALLOWED_RADIUS_KM[0]
 
     config = get_config()
-    source = CAMPAIGNS if config.mock_mode else []
+    if not config.mock_mode:
+        # Never an empty list here: the frontend cannot tell "no stores nearby"
+        # apart from "the subgraph is not wired up", and would show the wrong
+        # empty state for hours before anyone noticed.
+        raise HTTPException(501, "Subgraph not connected yet")
 
     hits = []
-    for campaign in source:
+    for campaign in CAMPAIGNS:
         if not campaign.active or not _matches(campaign, q):
             continue
         metres = distance_meters(lat, lon, campaign.lat, campaign.lon)
