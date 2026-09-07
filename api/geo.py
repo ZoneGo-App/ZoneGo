@@ -47,6 +47,35 @@ def encode_geohash(lat: float, lon: float, precision: int = 8) -> str:
     return "".join(out)
 
 
+def decode_geohash(geohash: str) -> tuple[float, float]:
+    """Centre of the cell, as (lat, lon).
+
+    The chain stores a geohash, not coordinates, so this is how a campaign read
+    back from the subgraph gets a point to measure distance from. Precision 8
+    puts that centre within about twenty metres of the real door, which is well
+    inside the smallest radius anyone can pick.
+    """
+    lat_range = [-90.0, 90.0]
+    lon_range = [-180.0, 180.0]
+    even = True
+
+    for char in geohash:
+        index = BASE32.find(char)
+        if index < 0:
+            raise ValueError(f"not a geohash character: {char!r}")
+        for shift in (4, 3, 2, 1, 0):
+            bit = (index >> shift) & 1
+            target = lon_range if even else lat_range
+            mid = sum(target) / 2
+            if bit:
+                target[0] = mid
+            else:
+                target[1] = mid
+            even = not even
+
+    return sum(lat_range) / 2, sum(lon_range) / 2
+
+
 def distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance. Good enough at city scale, and cheap."""
     p1, p2 = radians(lat1), radians(lat2)
