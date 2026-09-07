@@ -5,16 +5,17 @@ schema:
   file: ./schema.graphql
 
 dataSources:
-  # Addresses are placeholders until Sebastian deploys. Everything else —
-  # schema, handlers, codegen, build — is already exercised without them, so
-  # going live is a matter of pasting three addresses and one start block.
+  # Base Sepolia, deployed 7 September in blocks 46522139 and 46522140. The
+  # start block is the earlier of the two for all three: indexing from before a
+  # contract exists costs nothing, and one number is easier to keep true than
+  # three.
   - kind: ethereum
     name: CampaignVault
     network: base-sepolia
     source:
       abi: CampaignVault
-      address: "0x0000000000000000000000000000000000000000"
-      startBlock: 0
+      address: "0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0"
+      startBlock: 46522139
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -27,11 +28,6 @@ dataSources:
         - name: CampaignVault
           file: ./abis/CampaignVault.json
       eventHandlers:
-        # CampaignCreated is not emitted by the contract yet. The ABI matches
-        # the shape agreed in schema/events.md, so indexing starts working the
-        # day Sebastian adds it, with no change here. Until then a campaign is
-        # only discovered when it is funded, and its reward, cap, radius and
-        # zone stay empty.
         - event: CampaignCreated(indexed uint256,indexed address,uint256,uint256,bytes32,uint256)
           handler: handleCampaignCreated
         - event: CampaignFunded(indexed uint256,indexed address,uint256)
@@ -42,8 +38,8 @@ dataSources:
     network: base-sepolia
     source:
       abi: VisitRegistry
-      address: "0x0000000000000000000000000000000000000000"
-      startBlock: 0
+      address: "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
+      startBlock: 46522139
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -69,9 +65,12 @@ dataSources:
     name: FraudOracle
     network: base-sepolia
     source:
+      # Skeleton: commitEpoch still reverts, so nothing is emitted here yet.
+      # Indexed from the start anyway, so the first committed epoch appears
+      # without a redeploy.
       abi: FraudOracle
-      address: "0x0000000000000000000000000000000000000000"
-      startBlock: 0
+      address: "0x5157504d3a9683Ca953EF5db1255dE619E110A9B"
+      startBlock: 46522139
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
