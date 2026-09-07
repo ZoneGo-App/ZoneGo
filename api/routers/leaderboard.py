@@ -13,7 +13,7 @@ from api import subgraph
 from api.config import get_config
 from api.mock_data import MOCK_EXPLORERS, MOCK_MERCHANTS
 from api.points import week_start_of
-from api.schemas import LeaderboardEntry
+from api.schemas import LeaderboardEntry, PlayerStanding
 from api.zones import zone_name
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
@@ -86,6 +86,40 @@ query ZoneVisits($first: Int!, $zone: String!) {
 """
 
 
+# One player's own record, plus everyone standing above them. The Graph has no
+# count aggregate, so a rank is the length of that second list. Capping it at a
+# thousand keeps a single query bounded — past that the exact number stops
+# meaning anything to the person reading it anyway.
+ME = """
+query Me($address: Bytes!) {
+  visitor(id: $address) {
+    id
+    points
+    visitCount
+    distinctMerchants
+  }
+}
+"""
+
+ABOVE_ME = """
+query AboveMe($points: Int!) {
+  visitors(first: 1000, where: { points_gt: $points }) {
+    id
+  }
+}
+"""
+
+JUST_ABOVE = """
+query JustAbove($points: Int!) {
+  visitors(first: 1, where: { points_gt: $points }, orderBy: points, orderDirection: asc) {
+    points
+  }
+}
+"""
+
+RANK_CAP = 1000
+
+
 def short(address: str) -> str:
     return f"{address[:6]}…{address[-4:]}"
 
@@ -141,6 +175,71 @@ def _rank_for_week(scope: str, week_start: int, limit: int) -> list[LeaderboardE
         )
         for position, node in enumerate(nodes, start=1)
     ]
+
+
+def _standing_from_mock(address: str, zone: str | None, week: int | None):
+    rows = MOCK_EXPLORERS if zone is None else [
+        r for r in MOCK_EXPLORERS if r.zone == zone
+    ]
+    ordered = sorted(rows, key=lambda r: r.points or 0, reverse=True)
+
+    mine = next((r for r in ordered if r.address.lower() == address.lower()), None)
+    if mine is None:
+        raise HTTPException(404, "That wallet has no verified visits yet")
+
+    position = ordered.index(mine) + 1
+    ahead = ordered[position - 2] if position > 1 else None
+
+    return PlayerStanding(
+        address=mine.address,
+        label=mine.label,
+        points=mine.points or 0,
+        visits=mine.visits,
+        distinct_merchants=mine.distinct_merchants or 0,
+        rank=position,
+        players=len(ordered),
+        points_to_next=(ahead.points or 0) - (mine.points or 0) + 1 if ahead else None,
+        zone=zone,
+        zone_name=zone_name(zone) if zone else None,
+        week_start=week_start_of(week) if week is not None else None,
+    )
+
+
+@router.get("/me", response_model=PlayerStanding)
+def my_standing(
+    address: str = Query(..., pattern=r"^0x[0-9a-fA-F]{40}$"),
+    zone: str | None = Query(None, min_length=6, max_length=6, pattern="^[0-9b-hjkmnp-z]+$"),
+    week: int | None = Query(None, ge=0),
+):
+    """Where one player stands, and how far the next place is."""
+    config = get_config()
+    if config.mock_mode:
+        return _standing_from_mock(address, zone, week)
+
+    try:
+        node = subgraph.run(ME, {"address": address.lower()}).get("visitor")
+        if node is None:
+            raise HTTPException(404, "That wallet has no verified visits yet")
+
+        points = int(node["points"])
+        ahead = subgraph.run(ABOVE_ME, {"points": points}).get("visitors", [])
+        nearest = subgraph.run(JUST_ABOVE, {"points": points}).get("visitors", [])
+    except subgraph.SubgraphError as exc:
+        raise HTTPException(502, f"Subgraph unavailable: {exc}") from exc
+
+    return PlayerStanding(
+        address=node["id"],
+        label=short(node["id"]),
+        points=points,
+        visits=int(node["visitCount"]),
+        distinct_merchants=int(node["distinctMerchants"]),
+        # Past a thousand places up, the exact number tells the reader nothing.
+        rank=len(ahead) + 1 if len(ahead) < RANK_CAP else None,
+        points_to_next=(int(nearest[0]["points"]) - points + 1) if nearest else None,
+        zone=zone,
+        zone_name=zone_name(zone) if zone else None,
+        week_start=week_start_of(week) if week is not None else None,
+    )
 
 
 @router.get("", response_model=list[LeaderboardEntry])

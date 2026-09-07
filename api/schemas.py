@@ -58,6 +58,29 @@ class LeaderboardEntry(BaseModel):
     week_start: int | None = None
 
 
+class PlayerStanding(BaseModel):
+    """One player's own view of the game.
+
+    A bare position demotivates almost everyone: being 812th tells you nothing
+    you want to hear. What moves people is their own progress and how close the
+    next place is, so both travel with the rank.
+    """
+
+    address: str
+    label: str
+    points: int = Field(..., ge=0)
+    visits: int = Field(..., ge=0)
+    distinct_merchants: int = Field(..., ge=0)
+    rank: int | None = Field(None, ge=1)
+    "How many players this table holds, so a rank reads as '12 of 47'."
+    players: int | None = Field(None, ge=0)
+    "Points needed to pass whoever is directly above. Null when already first."
+    points_to_next: int | None = Field(None, ge=1)
+    zone: str | None = None
+    zone_name: str | None = None
+    week_start: int | None = None
+
+
 class ScoreRequest(BaseModel):
     visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
     campaign_id: int = Field(..., ge=0)
