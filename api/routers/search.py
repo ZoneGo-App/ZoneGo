@@ -8,6 +8,7 @@ says corner store.
 
 from fastapi import APIRouter, HTTPException, Query
 
+from api import subgraph
 from api.config import get_config
 from api.geo import distance_meters
 from api.mock_data import CAMPAIGNS
@@ -40,14 +41,19 @@ def search(
         radius_km = ALLOWED_RADIUS_KM[0]
 
     config = get_config()
-    if not config.mock_mode:
-        # Never an empty list here: the frontend cannot tell "no stores nearby"
-        # apart from "the subgraph is not wired up", and would show the wrong
-        # empty state for hours before anyone noticed.
-        raise HTTPException(501, "Subgraph not connected yet")
+    if config.mock_mode:
+        source = CAMPAIGNS
+    else:
+        try:
+            source = subgraph.list_campaigns()
+        except subgraph.SubgraphError as exc:
+            # Never an empty list on failure: the frontend cannot tell "no
+            # stores nearby" apart from "the subgraph is down", and would show
+            # the wrong empty state for hours before anyone noticed.
+            raise HTTPException(502, f"Subgraph unavailable: {exc}") from exc
 
     hits = []
-    for campaign in CAMPAIGNS:
+    for campaign in source:
         if not campaign.active or not _matches(campaign, q):
             continue
         metres = distance_meters(lat, lon, campaign.lat, campaign.lon)
