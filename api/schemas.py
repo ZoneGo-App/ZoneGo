@@ -32,6 +32,20 @@ class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
 
 
+class LeaderboardEntry(BaseModel):
+    rank: int = Field(..., ge=1)
+    address: str
+    "What to show when there is no name: a shortened address."
+    label: str
+    visits: int = Field(..., ge=0)
+    """
+    Only filled for explorers: how many different stores they have been to.
+    It is the number the discovery bonus will reward, and it cannot be
+    computed without an index of the chain.
+    """
+    distinct_merchants: int | None = None
+
+
 class ScoreRequest(BaseModel):
     visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
     campaign_id: int = Field(..., ge=0)
