@@ -138,6 +138,52 @@ class ClaimResponse(BaseModel):
     relayed: bool = True
 
 
+class EpochWindow(BaseModel):
+    """Which batch of scores is open, and how long until it closes.
+
+    The panel needs this to say "your score is final in 14 minutes" rather than
+    leaving a held reward looking permanent.
+    """
+
+    epoch: int = Field(..., ge=0)
+    start: int
+    end: int
+    seconds_remaining: int = Field(..., ge=0)
+
+
+class EpochCommitment(BaseModel):
+    """One closed epoch: the root, and enough to rebuild it independently."""
+
+    epoch: int = Field(..., ge=0)
+    "[start, end) in unix seconds — the visits this root was built from."
+    start: int
+    end: int
+    root: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    "How many wallets are in the tree."
+    wallets: int = Field(..., ge=1)
+    # False until FraudOracle.commitEpoch exists and the contract is deployed.
+    # Stated rather than assumed: a root we computed and a root anybody can
+    # check against the chain are very different claims.
+    committed: bool = False
+
+
+class ScoreProof(BaseModel):
+    """What we said about one wallet in one epoch, and the proof of it."""
+
+    epoch: int = Field(..., ge=0)
+    address: str
+    "The model score, 0 to 1, for a person to read."
+    score: float = Field(..., ge=0, le=1)
+    "The same number as the contract takes it: basis points, 0 to 10_000."
+    score_bps: int = Field(..., ge=0, le=10_000)
+    root: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    """
+    Siblings for `MerkleProof.verify`, bottom to top. Empty is valid and means
+    the epoch held exactly one wallet, so the leaf is already the root.
+    """
+    proof: list[str]
+
+
 class QrSignResponse(BaseModel):
     # The full EIP-712 document the merchant wallet signs. Handed over as-is so
     # the frontend passes it straight to the wallet without rebuilding it.

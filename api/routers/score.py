@@ -49,6 +49,17 @@ def _placeholder_score(visitor: str, campaign_id: int) -> tuple[float, list[Feat
     return round(score, 4), features[:3]
 
 
+def wallet_score(visitor: str) -> float:
+    """One score for a wallet, independent of any single visit.
+
+    What an epoch commits is a wallet and a number, so the per-claim score is
+    the wrong shape for it. Edmer's model replaces the derivation, not this
+    signature.
+    """
+    value, _ = _placeholder_score(visitor, 0)
+    return value
+
+
 @router.post("", response_model=ScoreResponse)
 def score(req: ScoreRequest):
     config = get_config()

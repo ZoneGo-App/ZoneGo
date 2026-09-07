@@ -41,6 +41,12 @@ class Config(BaseSettings):
     # verifies. Keep it funded with testnet ETH and out of the repository.
     relay_private_key: str = ""
 
+    # How long a batch of fraud scores stays open before its root is committed.
+    # An hour is short enough that a held reward is resolved the same afternoon,
+    # and long enough that we are not paying gas every few minutes. Changing it
+    # renumbers every past epoch, so it moves with the contract or not at all.
+    epoch_seconds: int = 3600
+
     # The QR on the merchant screen redraws every 30 seconds, but a signature
     # stays valid for 90. The gap is deliberate: a slow scan on a bad phone
     # should not fail, and a photographed QR is still dead a minute later.

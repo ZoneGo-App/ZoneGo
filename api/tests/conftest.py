@@ -13,7 +13,7 @@ after this and wins.
 
 import pytest
 
-from api import chain
+from api import chain, epochs
 from api.config import get_config
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -29,7 +29,10 @@ def pinned_settings(monkeypatch):
     monkeypatch.setattr(config, "campaign_vault_address", ZERO_ADDRESS)
     monkeypatch.setattr(config, "visit_registry_address", ZERO_ADDRESS)
     # Node reads are memoised across calls, so a campaign cached by one test
-    # would answer in the next one.
+    # would answer in the next one. An epoch is cached the same way, and it is
+    # worse: a root built under one test's wallets would be served to the next.
     chain.clear_cache()
+    epochs.clear_cache()
     yield
     chain.clear_cache()
+    epochs.clear_cache()
