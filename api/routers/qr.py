@@ -10,25 +10,18 @@ from fastapi import APIRouter, HTTPException
 
 from api.config import get_config
 from api.eip712 import build_payload
-from api.mock_data import CAMPAIGNS
+from api.routers.campaigns import resolve as resolve_campaign
 from api.schemas import QrSignRequest, QrSignResponse
 
 router = APIRouter(prefix="/qr", tags=["qr"])
 
 
-def _find_campaign(campaign_id: int):
-    config = get_config()
-    if not config.mock_mode:
-        raise HTTPException(501, "Chain reads not connected yet")
-    for campaign in CAMPAIGNS:
-        if campaign.campaign_id == campaign_id:
-            return campaign
-    raise HTTPException(404, "Campaign not found")
-
-
 @router.post("/sign", response_model=QrSignResponse)
 def sign(req: QrSignRequest):
-    campaign = _find_campaign(req.campaign_id)
+    # The geohash goes into the signed struct, so it has to be the one the
+    # contract holds. Same view the relay validates against, for the same
+    # reason: a payload built from stale data is a signature that fails.
+    campaign = resolve_campaign(req.campaign_id)
     if not campaign.active:
         raise HTTPException(409, "Campaign is not active")
     if campaign.balance < campaign.reward_per_visit:

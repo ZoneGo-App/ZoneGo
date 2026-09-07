@@ -1,7 +1,10 @@
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 
+from api import chain, subgraph
+from api.config import get_config
 from api.main import app
 
 client = TestClient(app)
@@ -50,4 +53,41 @@ def test_signature_outlives_the_qr_on_screen():
 
 
 def test_unknown_campaign_returns_404():
+    assert client.post("/qr/sign", json={"campaign_id": 999}).status_code == 404
+
+
+ON_CHAIN = chain.OnChainCampaign(
+    campaign_id=1,
+    merchant="0x1F6BFD8F9242aC5eEf6b21082a9C460907e39e03",
+    reward_per_visit=50_000,
+    daily_cap=60,
+    geohash="dr5rsm47",
+    lat=40.7205,
+    lon=-73.9855,
+    radius_meters=120,
+    balance=48_500_000,
+)
+
+
+@pytest.fixture
+def live(monkeypatch):
+    monkeypatch.setattr(get_config(), "mock_mode", False)
+    monkeypatch.setattr(subgraph, "get_campaign", lambda campaign_id: None)
+    monkeypatch.setattr(
+        chain, "get_campaign", lambda campaign_id: ON_CHAIN if campaign_id == 1 else None
+    )
+
+
+def test_a_merchant_can_sign_against_a_real_campaign(live):
+    """Used to be a 501: the payload was only buildable from the samples."""
+    assert client.post("/qr/sign", json={"campaign_id": 1}).status_code == 200
+
+
+def test_the_signed_geohash_is_the_one_the_contract_holds(live):
+    """A payload built from a stale geohash is a signature that fails on chain."""
+    message = client.post("/qr/sign", json={"campaign_id": 1}).json()["typed_data"]["message"]
+    assert message["geohash"] == "0x" + b"dr5rsm47".hex().ljust(64, "0")
+
+
+def test_a_campaign_that_is_not_on_chain_is_404_when_live(live):
     assert client.post("/qr/sign", json={"campaign_id": 999}).status_code == 404
