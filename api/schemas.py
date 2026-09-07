@@ -32,6 +32,31 @@ class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
 
 
+class ClaimRequest(BaseModel):
+    """Everything the visitor's phone read off the QR, plus who they are.
+
+    The merchant signature travels untouched from the QR to the contract. The
+    relay only pays the gas — it cannot alter any of this without the contract
+    rejecting the signature.
+    """
+
+    campaign_id: int = Field(..., ge=0)
+    nonce: int = Field(..., ge=0)
+    expiry: int = Field(..., gt=0)
+    geohash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
+    world_proof: str = Field("", max_length=4096)
+
+
+class ClaimResponse(BaseModel):
+    tx_hash: str
+    status: str
+    # False once the visitor has gas of their own and sends it themselves. The
+    # relay is a convenience, never a requirement.
+    relayed: bool = True
+
+
 class QrSignResponse(BaseModel):
     # The full EIP-712 document the merchant wallet signs. Handed over as-is so
     # the frontend passes it straight to the wallet without rebuilding it.
