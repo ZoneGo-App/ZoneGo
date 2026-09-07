@@ -48,11 +48,22 @@ type Visitor @entity(immutable: false) {
   visits: [Visit!]! @derivedFrom(field: "visitor")
   "Drives the explorer leaderboard."
   visitCount: Int!
-  "How many different stores they have been to. This is the number the
-   discovery bonus rewards, and it cannot be derived without an index."
+  """
+  How many different stores they have been to. This is the number the
+  discovery bonus rewards, and it cannot be derived without an index.
+  """
   distinctMerchants: Int!
   totalEarned: BigInt!
   firstSeenAt: BigInt!
+}
+
+type VisitorMerchant @entity(immutable: false) {
+  "Visitor address followed by merchant address."
+  id: Bytes!
+  visitor: Visitor!
+  merchant: Merchant!
+  visits: Int!
+  firstVisitAt: BigInt!
 }
 
 type Visit @entity(immutable: true) {
@@ -83,8 +94,10 @@ type Epoch @entity(immutable: true) {
   "The epoch number, as bytes."
   id: Bytes!
   epoch: BigInt!
-  "Merkle root of (wallet, fraud score) pairs committed for this epoch.
-   Published on chain so a score cannot be rewritten after the fact."
+  """
+  Merkle root of (wallet, fraud score) pairs committed for this epoch.
+  Published on chain so a score cannot be rewritten after the fact.
+  """
   merkleRoot: Bytes!
   timestamp: BigInt!
 }
