@@ -21,6 +21,13 @@ class Config(BaseSettings):
     # Base Sepolia: the one testnet all three sponsors support.
     chain_id: int = 84532
     visit_registry_address: str = "0x0000000000000000000000000000000000000000"
+    campaign_vault_address: str = "0x0000000000000000000000000000000000000000"
+
+    # A node read is one round trip to an RPC provider, so the same campaign
+    # asked for twice in a second costs twice. Shorter than the subgraph's
+    # window because this is the path used when freshness is the point.
+    rpc_cache_seconds: float = 2.0
+    rpc_timeout_seconds: float = 8.0
 
     # The QR on the merchant screen redraws every 30 seconds, but a signature
     # stays valid for 90. The gap is deliberate: a slow scan on a bad phone

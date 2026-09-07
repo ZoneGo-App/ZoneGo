@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 
 from api.config import get_config
+from api.eip712 import geohash_from_bytes32
 from api.geo import decode_geohash
 from api.schemas import Campaign
 
@@ -95,13 +96,8 @@ def run(document: str, variables: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _geohash_text(raw: str) -> str:
-    """The chain holds bytes32; strip the 0x and the zero padding."""
-    return bytes.fromhex(raw.removeprefix("0x")).rstrip(b"\x00").decode("ascii")
-
-
 def to_campaign(node: dict[str, Any]) -> Campaign:
-    geohash = _geohash_text(node["geohash"])
+    geohash = geohash_from_bytes32(node["geohash"])
     lat, lon = decode_geohash(geohash)
     merchant = node["merchant"]["id"]
 

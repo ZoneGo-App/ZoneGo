@@ -37,6 +37,17 @@ def geohash_to_bytes32(geohash: str) -> str:
     return "0x" + raw.hex().ljust(64, "0")
 
 
+def geohash_from_bytes32(raw: str | bytes) -> str:
+    """The inverse, for values read back off the chain.
+
+    The subgraph hands these over as a hex string and an `eth_call` as raw
+    bytes, so both forms arrive here rather than being unpacked twice.
+    """
+    if isinstance(raw, str):
+        raw = bytes.fromhex(raw.removeprefix("0x"))
+    return raw.rstrip(b"\x00").decode("ascii")
+
+
 def new_nonce() -> int:
     """Single-use nonce. The contract records it so a photographed QR dies."""
     return secrets.randbits(64)
