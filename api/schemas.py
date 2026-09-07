@@ -20,7 +20,11 @@ class Campaign(BaseModel):
     radius_meters: int = Field(..., gt=0, le=2000)
     balance: int = Field(..., ge=0)
     active: bool = True
-    created_at: datetime
+    # Null when the answer came from the vault rather than the subgraph: the
+    # contract holds no creation time, only an index knows when something
+    # happened. Left empty instead of guessed, so a caller can tell which of
+    # the two answered.
+    created_at: datetime | None = None
 
 
 class SearchHit(BaseModel):
