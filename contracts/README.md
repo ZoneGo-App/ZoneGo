@@ -68,3 +68,10 @@ $ cast --help
 ## Deployed contracts (Base Sepolia)
 
 - CampaignVault: 0x7447823C46C6E8E7039Ae239cf6F709cBC3CA467
+
+## Deployed contracts (Base Sepolia) — updated
+
+- CampaignVault: 0x01422196A7768839f24E465115Ff97E170186Bf1
+- VisitRegistry: 0x1d86E71956c6486c53fD965926c57121E7b1dda0
+
+(Previous CampaignVault deploy at 0x7447823C46C6E8E7039Ae239cf6F709cBC3CA467 is now obsolete.)
