@@ -15,6 +15,7 @@ import time
 
 from fastapi import APIRouter, HTTPException
 
+from api import relay
 from api.config import get_config
 from api.eip712 import geohash_to_bytes32
 from api.routers.campaigns import resolve as resolve_campaign
@@ -46,16 +47,28 @@ def claim(req: ClaimRequest):
 
     config = get_config()
     if not config.mock_mode:
-        # Everything above already ran against the real campaign, so only the
-        # sending is missing. Waiting on the deployed VisitRegistry address and
-        # a key with gas; the call is
-        #
-        #   claim(VisitSig sig, address visitor, bytes signature, bytes32 nullifierHash)
-        #
-        # Note `visitor` sits outside the signed struct: whoever sends the
-        # transaction picks who gets paid. Until World's proof binds the two,
-        # that choice is ours, and it is the question a judge will ask.
-        raise HTTPException(501, "Relay not connected to the chain yet")
+        if not req.nullifier_hash:
+            # Zero would put every visitor in one weekly bucket, so the second
+            # person to claim anywhere would be paid 50% of a reward that was
+            # their first. Refusing beats paying the wrong amount.
+            raise HTTPException(400, "nullifier_hash is required")
+
+        try:
+            tx_hash = relay.send_claim(
+                relay.Claim(
+                    campaign_id=req.campaign_id,
+                    nonce=req.nonce,
+                    expiry=req.expiry,
+                    geohash=req.geohash,
+                    signature=req.signature,
+                    visitor=req.visitor,
+                    nullifier_hash=req.nullifier_hash,
+                )
+            )
+        except relay.RelayError as exc:
+            raise HTTPException(502, f"Relay failed: {exc}") from exc
+
+        return ClaimResponse(tx_hash=tx_hash, status="submitted", relayed=True)
 
     # Deterministic stand-in for a transaction hash: the same claim always
     # yields the same value, so the frontend can be tested against it.

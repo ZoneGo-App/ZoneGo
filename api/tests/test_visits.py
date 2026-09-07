@@ -3,7 +3,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from api import chain, subgraph
+from api import chain, relay, subgraph
 from api.config import get_config
 from api.main import app
 
@@ -81,6 +81,10 @@ ON_CHAIN = chain.OnChainCampaign(
 )
 
 
+NULLIFIER = "0x" + "c3" * 32
+SUBMITTED = "0x" + "ab" * 32
+
+
 @pytest.fixture
 def live(monkeypatch):
     """Live mode with the chain as the only source, the way it starts out."""
@@ -89,16 +93,38 @@ def live(monkeypatch):
     monkeypatch.setattr(
         chain, "get_campaign", lambda campaign_id: ON_CHAIN if campaign_id == 1 else None
     )
+    monkeypatch.setattr(relay, "send_claim", lambda claim: SUBMITTED)
 
 
-def test_a_real_campaign_gets_past_validation(live):
-    """501 and not 404: it reached the part that is genuinely missing.
+def test_a_real_campaign_is_submitted_to_the_chain(live):
+    """Validated against the contract, then relayed — not the sample data."""
+    r = client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    assert r.status_code == 200
+    assert r.json()["tx_hash"] == SUBMITTED
+    assert r.json()["status"] == "submitted"
 
-    The sample campaigns are not a source once the contracts are live, and
-    validating against them refused every real claim before it got here.
-    """
-    r = client.post("/visits/claim", json=a_claim())
-    assert r.status_code == 501
+
+def test_the_signed_fields_are_passed_through_untouched(live, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(relay, "send_claim", lambda claim: seen.setdefault("c", claim) and SUBMITTED)
+    client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    assert seen["c"].signature == SIGNATURE
+    assert seen["c"].visitor == VISITOR
+    assert seen["c"].nullifier_hash == NULLIFIER
+
+
+def test_a_claim_without_a_nullifier_is_refused(live):
+    """Zero would put every visitor in one weekly bucket and misprice rewards."""
+    assert client.post("/visits/claim", json=a_claim()).status_code == 400
+
+
+def test_a_relay_failure_is_502_not_500(live, monkeypatch):
+    def boom(claim):
+        raise relay.RelayError("node unreachable")
+
+    monkeypatch.setattr(relay, "send_claim", boom)
+    r = client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    assert r.status_code == 502
 
 
 def test_an_unknown_campaign_is_still_404_when_live(live):

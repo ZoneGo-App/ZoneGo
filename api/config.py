@@ -29,6 +29,11 @@ class Config(BaseSettings):
     rpc_cache_seconds: float = 2.0
     rpc_timeout_seconds: float = 8.0
 
+    # Pays the gas so a visitor with an empty wallet can still claim. It signs
+    # transactions, never visits — the merchant's signature is what the contract
+    # verifies. Keep it funded with testnet ETH and out of the repository.
+    relay_private_key: str = ""
+
     # The QR on the merchant screen redraws every 30 seconds, but a signature
     # stays valid for 90. The gap is deliberate: a slow scan on a bad phone
     # should not fail, and a photographed QR is still dead a minute later.

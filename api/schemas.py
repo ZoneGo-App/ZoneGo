@@ -124,6 +124,10 @@ class ClaimRequest(BaseModel):
     signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
     visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
     world_proof: str = Field("", max_length=4096)
+    # What the contract actually stores: one human, not one wallet. It keys the
+    # weekly 100/50/25/0 curve, so two visitors sharing a nullifier would share
+    # a payout curve. Optional only while the samples stand in for the chain.
+    nullifier_hash: str = Field("", pattern=r"^(0x[0-9a-fA-F]{64})?$")
 
 
 class ClaimResponse(BaseModel):
