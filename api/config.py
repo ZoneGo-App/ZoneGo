@@ -9,6 +9,10 @@ class Config(BaseSettings):
     subgraph_url: str = ""
     fraud_threshold: float = 0.72
 
+    # Comma separated. The deployed frontend lives on its own domain, so this
+    # has to be set in production or the browser blocks every request.
+    cors_origins: str = "http://localhost:3000"
+
     # Base Sepolia: the one testnet all three sponsors support.
     chain_id: int = 84532
     visit_registry_address: str = "0x0000000000000000000000000000000000000000"
@@ -23,3 +27,7 @@ class Config(BaseSettings):
 @lru_cache
 def get_config() -> Config:
     return Config()
+
+
+def cors_origin_list() -> list[str]:
+    return [o.strip() for o in get_config().cors_origins.split(",") if o.strip()]
