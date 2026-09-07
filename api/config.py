@@ -9,6 +9,11 @@ class Config(BaseSettings):
     subgraph_url: str = ""
     fraud_threshold: float = 0.72
 
+    # Seconds a subgraph answer is reused. Search and the merchant panel ask
+    # for the same campaigns within the same second.
+    subgraph_cache_seconds: float = 5.0
+    subgraph_timeout_seconds: float = 8.0
+
     # Comma separated. The deployed frontend lives on its own domain, so this
     # has to be set in production or the browser blocks every request.
     cors_origins: str = "http://localhost:3000"
