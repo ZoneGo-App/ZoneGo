@@ -17,17 +17,10 @@ from fastapi import APIRouter, HTTPException
 
 from api.config import get_config
 from api.eip712 import geohash_to_bytes32
-from api.mock_data import CAMPAIGNS
+from api.routers.campaigns import resolve as resolve_campaign
 from api.schemas import ClaimRequest, ClaimResponse
 
 router = APIRouter(prefix="/visits", tags=["visits"])
-
-
-def _campaign_or_404(campaign_id: int):
-    for campaign in CAMPAIGNS:
-        if campaign.campaign_id == campaign_id:
-            return campaign
-    raise HTTPException(404, "Campaign not found")
 
 
 @router.post("/claim", response_model=ClaimResponse)
@@ -37,7 +30,11 @@ def claim(req: ClaimRequest):
         # a photographed screen is worthless — which is the point.
         raise HTTPException(410, "Signature expired, scan the QR again")
 
-    campaign = _campaign_or_404(req.campaign_id)
+    # The same view the caller read off GET /campaigns/{id}: the vault for the
+    # balance and the geohash, the index for the rest. Validating against the
+    # sample data instead would refuse every real campaign once the contracts
+    # are live, and pass claims for stores that no longer have funds.
+    campaign = resolve_campaign(req.campaign_id)
     if not campaign.active:
         raise HTTPException(409, "Campaign is not active")
     if campaign.balance < campaign.reward_per_visit:
@@ -49,9 +46,15 @@ def claim(req: ClaimRequest):
 
     config = get_config()
     if not config.mock_mode:
-        # Waiting on the deployed VisitRegistry address and its ABI. The call
-        # is claim(VisitSig, signature, worldProof) — already fixed in the
-        # contract skeleton, so only the sending is missing.
+        # Everything above already ran against the real campaign, so only the
+        # sending is missing. Waiting on the deployed VisitRegistry address and
+        # a key with gas; the call is
+        #
+        #   claim(VisitSig sig, address visitor, bytes signature, bytes32 nullifierHash)
+        #
+        # Note `visitor` sits outside the signed struct: whoever sends the
+        # transaction picks who gets paid. Until World's proof binds the two,
+        # that choice is ours, and it is the question a judge will ask.
         raise HTTPException(501, "Relay not connected to the chain yet")
 
     # Deterministic stand-in for a transaction hash: the same claim always

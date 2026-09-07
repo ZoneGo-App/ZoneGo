@@ -1,7 +1,10 @@
 import time
 
+import pytest
 from fastapi.testclient import TestClient
 
+from api import chain, subgraph
+from api.config import get_config
 from api.main import app
 
 client = TestClient(app)
@@ -63,3 +66,54 @@ def test_the_same_claim_is_idempotent_in_mock_mode():
     a = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
     b = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
     assert a == b
+
+
+ON_CHAIN = chain.OnChainCampaign(
+    campaign_id=1,
+    merchant="0x1F6BFD8F9242aC5eEf6b21082a9C460907e39e03",
+    reward_per_visit=50_000,
+    daily_cap=60,
+    geohash="dr5rsked",
+    lat=40.7185,
+    lon=-73.9880,
+    radius_meters=120,
+    balance=48_500_000,
+)
+
+
+@pytest.fixture
+def live(monkeypatch):
+    """Live mode with the chain as the only source, the way it starts out."""
+    monkeypatch.setattr(get_config(), "mock_mode", False)
+    monkeypatch.setattr(subgraph, "get_campaign", lambda campaign_id: None)
+    monkeypatch.setattr(
+        chain, "get_campaign", lambda campaign_id: ON_CHAIN if campaign_id == 1 else None
+    )
+
+
+def test_a_real_campaign_gets_past_validation(live):
+    """501 and not 404: it reached the part that is genuinely missing.
+
+    The sample campaigns are not a source once the contracts are live, and
+    validating against them refused every real claim before it got here.
+    """
+    r = client.post("/visits/claim", json=a_claim())
+    assert r.status_code == 501
+
+
+def test_an_unknown_campaign_is_still_404_when_live(live):
+    r = client.post("/visits/claim", json=a_claim(campaign_id=999))
+    assert r.status_code == 404
+
+
+def test_the_geohash_is_checked_against_the_chain_not_the_samples(live):
+    elsewhere = "0x" + b"dr5rsm47".hex().ljust(64, "0")
+    r = client.post("/visits/claim", json=a_claim(geohash=elsewhere))
+    assert r.status_code == 409
+
+
+def test_a_campaign_out_of_funds_never_reaches_the_chain(live, monkeypatch):
+    broke = chain.OnChainCampaign(**{**ON_CHAIN.__dict__, "balance": 0})
+    monkeypatch.setattr(chain, "get_campaign", lambda campaign_id: broke)
+    r = client.post("/visits/claim", json=a_claim())
+    assert r.status_code == 409

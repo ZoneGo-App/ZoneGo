@@ -81,8 +81,14 @@ def list_campaigns():
         raise HTTPException(502, f"Subgraph unavailable: {exc}") from exc
 
 
-@router.get("/{campaign_id}", response_model=Campaign)
-def get_campaign(campaign_id: int):
+def resolve(campaign_id: int) -> Campaign:
+    """One campaign as both sources see it, or an HTTP error saying why not.
+
+    Not folded into the route below because the relay validates a claim against
+    this same view. Two copies of "which source answers" would drift, and the
+    drift would show up as a claim we refuse for a campaign the caller can read
+    perfectly well.
+    """
     config = get_config()
     if config.mock_mode:
         for c in CAMPAIGNS:
@@ -113,3 +119,8 @@ def get_campaign(campaign_id: int):
     if onchain is None:
         raise HTTPException(404, "Campaign not found")
     return _from_chain(onchain)
+
+
+@router.get("/{campaign_id}", response_model=Campaign)
+def get_campaign(campaign_id: int):
+    return resolve(campaign_id)
