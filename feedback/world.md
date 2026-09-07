@@ -5,7 +5,17 @@ Mateo Sauton, in the ETHOnline workshop: *"don't be nice."*
 
 ## What we integrated
 
-_(pending)_
+**Backend, as of Sept 7 — Lucio.** The claim path carries the nullifier from the
+visitor's phone through our relay into `VisitRegistry`, which is what enforces
+one claim per person per campaign inside the window. In live mode the API
+refuses a claim with no nullifier rather than defaulting it to zero: a zero
+would put every visitor in one weekly bucket, so the second person to claim
+anywhere would be paid 50% of what was actually their first visit.
+
+The API does not verify the Selfie Check proof itself — it accepts the proof
+field and passes the nullifier on. Real verification lands with the contract.
+
+_(SDK integration and the verification flow — pending, David and Sebastián)_
 
 ## Developer feedback
 
