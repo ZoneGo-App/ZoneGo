@@ -64,3 +64,7 @@ $ forge --help
 $ anvil --help
 $ cast --help
 ```
+
+## Deployed contracts (Base Sepolia)
+
+- CampaignVault: 0x7447823C46C6E8E7039Ae239cf6F709cBC3CA467
