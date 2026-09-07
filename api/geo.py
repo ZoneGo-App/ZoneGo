@@ -10,6 +10,22 @@ from math import asin, cos, radians, sin, sqrt
 BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
 EARTH_RADIUS_M = 6_371_000
 
+# A zone is just a shorter geohash. Six characters is a cell of roughly
+# 1200 x 600 metres — about the size of a neighbourhood, and small enough that
+# being first in it is something a person can actually do.
+#
+# Deriving zones this way means we need no map data, no city dataset and no
+# API: the zone is already on chain inside the campaign's geohash, so anyone
+# can verify which zone a store belongs to. It also works unchanged in any
+# city in the world.
+ZONE_PRECISION = 6
+
+
+def zone_of(geohash: str) -> str:
+    if len(geohash) < ZONE_PRECISION:
+        raise ValueError(f"geohash too short to hold a zone: {geohash!r}")
+    return geohash[:ZONE_PRECISION]
+
 
 def encode_geohash(lat: float, lon: float, precision: int = 8) -> str:
     lat_range = [-90.0, 90.0]
