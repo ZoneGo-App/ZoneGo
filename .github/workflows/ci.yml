@@ -17,3 +17,29 @@ jobs:
 
       - name: Run tests
         run: pytest -q
+
+  # Runs only once Sebastian pushes contracts/. Until then it skips instead of
+  # failing, so a red CI always means something is actually broken.
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Look for contracts
+        id: look
+        run: |
+          if [ -d contracts ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No contracts/ directory yet, skipping forge test."
+          fi
+
+      - name: Install Foundry
+        if: steps.look.outputs.found == 'true'
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run forge test
+        if: steps.look.outputs.found == 'true'
+        working-directory: contracts
+        run: forge test -vv
