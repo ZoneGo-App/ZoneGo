@@ -4,13 +4,40 @@ import {
   Campaign,
   CampaignHour,
   Merchant,
+  MerchantWeek,
   Visitor,
   VisitorMerchant,
+  VisitorWeek,
 } from "../generated/schema";
 
 export const ZERO = BigInt.fromI32(0);
 export const HOUR = BigInt.fromI32(3600);
+export const DAY = BigInt.fromI32(86400);
+export const WEEK = BigInt.fromI32(604800);
 export const NO_MERCHANT = Address.zero();
+
+// Points. Five for showing up, five more the first time at that store, and
+// nothing at all for a second visit to the same store on the same day.
+export const POINTS_PER_VISIT = 5;
+export const POINTS_NEW_MERCHANT = 5;
+
+// The unix epoch fell on a Thursday, so a plain division puts week boundaries
+// on Thursdays. Monday is three days earlier, and adding S before dividing
+// moves every boundary S earlier — so three days lands them on Monday 00:00
+// UTC, which is what a person means by "this week".
+const MONDAY_SHIFT = BigInt.fromI32(259200);
+
+export function weekStartOf(timestamp: BigInt): BigInt {
+  return timestamp
+    .plus(MONDAY_SHIFT)
+    .div(WEEK)
+    .times(WEEK)
+    .minus(MONDAY_SHIFT);
+}
+
+export function dayOf(timestamp: BigInt): BigInt {
+  return timestamp.div(DAY);
+}
 
 // Six characters of geohash: a cell about 1200 x 600 metres. Small enough
 // that being first in your zone is something a person can actually do, and it
@@ -60,6 +87,7 @@ export function loadVisitor(address: Address, timestamp: BigInt): Visitor {
     visitor = new Visitor(address);
     visitor.visitCount = 0;
     visitor.distinctMerchants = 0;
+    visitor.points = 0;
     visitor.totalEarned = ZERO;
     visitor.firstSeenAt = timestamp;
     visitor.save();
@@ -114,16 +142,20 @@ export function loadCampaign(
 }
 
 /**
- * Records that this wallet has been to this store, and answers whether it is
- * the first time. That answer is what the discovery bonus pays for, and it is
- * impossible to compute without an index of the chain.
+ * What a visit is worth, and whether the store is new to this wallet.
+ *
+ * Returns [points, isNewMerchant]. Ten the first time at a store, five on a
+ * later day, nothing for coming back the same day — that last rule is why the
+ * pair records the day it last scored, and it is what stops someone farming a
+ * single counter all afternoon.
  */
-export function firstTimeHere(
+export function scoreVisit(
   visitor: Visitor,
   merchant: Merchant,
   timestamp: BigInt
-): boolean {
+): i32[] {
   const key = visitor.id.concat(merchant.id);
+  const today = dayOf(timestamp);
   let pair = VisitorMerchant.load(key);
 
   if (pair == null) {
@@ -132,13 +164,57 @@ export function firstTimeHere(
     pair.merchant = merchant.id;
     pair.visits = 1;
     pair.firstVisitAt = timestamp;
+    pair.lastScoredDay = today;
     pair.save();
-    return true;
+    return [POINTS_PER_VISIT + POINTS_NEW_MERCHANT, 1];
   }
 
   pair.visits = pair.visits + 1;
+  if (pair.lastScoredDay.equals(today)) {
+    pair.save();
+    return [0, 0];
+  }
+
+  pair.lastScoredDay = today;
   pair.save();
-  return false;
+  return [POINTS_PER_VISIT, 0];
+}
+
+export function loadVisitorWeek(
+  visitor: Visitor,
+  timestamp: BigInt
+): VisitorWeek {
+  const start = weekStartOf(timestamp);
+  const key = visitor.id.concatI32(start.toI32());
+  let week = VisitorWeek.load(key);
+  if (week == null) {
+    week = new VisitorWeek(key);
+    week.visitor = visitor.id;
+    week.weekStart = start;
+    week.points = 0;
+    week.visits = 0;
+    week.newMerchants = 0;
+    week.save();
+  }
+  return week;
+}
+
+export function loadMerchantWeek(
+  merchant: Merchant,
+  timestamp: BigInt
+): MerchantWeek {
+  const start = weekStartOf(timestamp);
+  const key = merchant.id.concatI32(start.toI32());
+  let week = MerchantWeek.load(key);
+  if (week == null) {
+    week = new MerchantWeek(key);
+    week.merchant = merchant.id;
+    week.weekStart = start;
+    week.visits = 0;
+    week.paid = ZERO;
+    week.save();
+  }
+  return week;
 }
 
 /**

@@ -8,11 +8,13 @@ import {
 import {
   NO_MERCHANT,
   eventKey,
-  firstTimeHere,
   loadCampaign,
   loadCampaignHour,
   loadMerchant,
+  loadMerchantWeek,
   loadVisitor,
+  loadVisitorWeek,
+  scoreVisit,
 } from "./helpers";
 
 export function handleVisitRecorded(event: VisitRecorded): void {
@@ -25,6 +27,13 @@ export function handleVisitRecorded(event: VisitRecorded): void {
   const campaign = loadCampaign(event.params.campaignId, NO_MERCHANT, timestamp);
   const merchant = loadMerchant(Address.fromBytes(campaign.merchant), timestamp);
 
+  // [points, isNewMerchant]. Doing this before the Visit is written means the
+  // visit itself carries what it was worth, so a score can be audited claim by
+  // claim rather than only as a running total.
+  const scored = scoreVisit(visitor, merchant, timestamp);
+  const points = scored[0];
+  const isNew = scored[1] == 1;
+
   const visit = new Visit(eventKey(event.transaction.hash, event.logIndex));
   visit.campaign = campaign.id;
   visit.visitor = visitor.id;
@@ -32,22 +41,36 @@ export function handleVisitRecorded(event: VisitRecorded): void {
   visit.nullifierHash = event.params.nullifierHash;
   visit.sigHash = event.params.sigHash;
   visit.zone = campaign.zone;
+  visit.points = points;
   visit.timestamp = timestamp;
   visit.blockNumber = event.block.number;
   visit.transactionHash = event.transaction.hash;
   visit.save();
 
-  if (firstTimeHere(visitor, merchant, timestamp)) {
+  if (isNew) {
     visitor.distinctMerchants = visitor.distinctMerchants + 1;
   }
   if (visitor.nullifierHash === null) {
     visitor.nullifierHash = event.params.nullifierHash;
   }
   visitor.visitCount = visitor.visitCount + 1;
+  visitor.points = visitor.points + points;
   visitor.save();
+
+  const visitorWeek = loadVisitorWeek(visitor, timestamp);
+  visitorWeek.visits = visitorWeek.visits + 1;
+  visitorWeek.points = visitorWeek.points + points;
+  if (isNew) {
+    visitorWeek.newMerchants = visitorWeek.newMerchants + 1;
+  }
+  visitorWeek.save();
 
   merchant.visitCount = merchant.visitCount + 1;
   merchant.save();
+
+  const merchantWeek = loadMerchantWeek(merchant, timestamp);
+  merchantWeek.visits = merchantWeek.visits + 1;
+  merchantWeek.save();
 
   campaign.visitCount = campaign.visitCount + 1;
   campaign.save();
@@ -80,6 +103,10 @@ export function handleRewardPaid(event: RewardPaid): void {
   const merchant = loadMerchant(Address.fromBytes(campaign.merchant), timestamp);
   merchant.totalPaid = merchant.totalPaid.plus(event.params.amount);
   merchant.save();
+
+  const merchantWeek = loadMerchantWeek(merchant, timestamp);
+  merchantWeek.paid = merchantWeek.paid.plus(event.params.amount);
+  merchantWeek.save();
 
   const bucket = loadCampaignHour(campaign, timestamp);
   bucket.paid = bucket.paid.plus(event.params.amount);

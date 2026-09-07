@@ -60,8 +60,34 @@ type Visitor @entity(immutable: false) {
   discovery bonus rewards, and it cannot be derived without an index.
   """
   distinctMerchants: Int!
+  """
+  Five a visit, ten when the store is new to them, nothing for a second visit
+  to the same store on the same day. Counted here rather than by our server,
+  so a player can check their own score against the chain.
+  """
+  points: Int!
   totalEarned: BigInt!
   firstSeenAt: BigInt!
+}
+
+type VisitorWeek @entity(immutable: false) {
+  "Visitor address followed by the start of the week."
+  id: Bytes!
+  visitor: Visitor!
+  "Monday 00:00 UTC of that week, as a unix timestamp."
+  weekStart: BigInt!
+  points: Int!
+  visits: Int!
+  newMerchants: Int!
+}
+
+type MerchantWeek @entity(immutable: false) {
+  "Merchant address followed by the start of the week."
+  id: Bytes!
+  merchant: Merchant!
+  weekStart: BigInt!
+  visits: Int!
+  paid: BigInt!
 }
 
 type VisitorMerchant @entity(immutable: false) {
@@ -71,6 +97,12 @@ type VisitorMerchant @entity(immutable: false) {
   merchant: Merchant!
   visits: Int!
   firstVisitAt: BigInt!
+  """
+  Day of the last visit that scored here, as a unix day number. A second visit
+  to the same store on the same day pays nothing and scores nothing — this is
+  what makes that rule checkable from the chain.
+  """
+  lastScoredDay: BigInt!
 }
 
 type Visit @entity(immutable: true) {
@@ -85,6 +117,8 @@ type Visit @entity(immutable: true) {
   sigHash: Bytes!
   "Copied from the campaign so the zone leaderboard is one query, not two."
   zone: String!
+  "What this visit scored: 10 for a new store, 5 for a known one, 0 same day."
+  points: Int!
   timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!
