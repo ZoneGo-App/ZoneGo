@@ -1,0 +1,100 @@
+# The only source of visit history in ZoneGo.
+#
+# Nothing here is computed by our servers: the leaderboard, the merchant panel
+# and the fraud model all read these entities, so anyone can verify their own
+# numbers against the chain without trusting us. That is what makes The Graph
+# load-bearing here rather than decorative.
+#
+# Counters are kept on the entities instead of being summed at query time. A
+# merchant panel that adds up ten thousand visits in the browser is slow, and
+# the leaderboard has to sort by a stored field to be paginated at all.
+
+type Merchant @entity(immutable: false) {
+  "The merchant wallet address."
+  id: Bytes!
+  campaigns: [Campaign!]! @derivedFrom(field: "merchant")
+  visits: [Visit!]! @derivedFrom(field: "merchant")
+  "Drives the most-visited stores leaderboard."
+  visitCount: Int!
+  totalPaid: BigInt!
+  firstSeenAt: BigInt!
+}
+
+type Campaign @entity(immutable: false) {
+  "The campaign id, as bytes."
+  id: Bytes!
+  campaignId: BigInt!
+  merchant: Merchant!
+  "USDC minor units paid per verified visit, before the protocol fee."
+  rewardPerVisit: BigInt!
+  dailyCap: Int!
+  "ASCII geohash of the store, right-padded — the same value the merchant signs."
+  geohash: Bytes!
+  radiusMeters: Int!
+  "Everything funded so far, minus everything paid out."
+  balance: BigInt!
+  active: Boolean!
+  createdAt: BigInt!
+  visits: [Visit!]! @derivedFrom(field: "campaign")
+  visitCount: Int!
+  totalPaid: BigInt!
+}
+
+type Visitor @entity(immutable: false) {
+  "The visitor wallet address."
+  id: Bytes!
+  "World nullifier bound to this wallet. Null until they verify."
+  nullifierHash: Bytes
+  visits: [Visit!]! @derivedFrom(field: "visitor")
+  "Drives the explorer leaderboard."
+  visitCount: Int!
+  "How many different stores they have been to. This is the number the
+   discovery bonus rewards, and it cannot be derived without an index."
+  distinctMerchants: Int!
+  totalEarned: BigInt!
+  firstSeenAt: BigInt!
+}
+
+type Visit @entity(immutable: true) {
+  "Transaction hash and log index."
+  id: Bytes!
+  campaign: Campaign!
+  visitor: Visitor!
+  "Denormalised so the store leaderboard does not have to walk campaigns."
+  merchant: Merchant!
+  nullifierHash: Bytes!
+  "Hash of the merchant signature that authorised this visit."
+  sigHash: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Reward @entity(immutable: true) {
+  id: Bytes!
+  campaign: Campaign!
+  visitor: Visitor!
+  amount: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Epoch @entity(immutable: true) {
+  "The epoch number, as bytes."
+  id: Bytes!
+  epoch: BigInt!
+  "Merkle root of (wallet, fraud score) pairs committed for this epoch.
+   Published on chain so a score cannot be rewritten after the fact."
+  merkleRoot: Bytes!
+  timestamp: BigInt!
+}
+
+type CampaignHour @entity(immutable: false) {
+  "Campaign id and the hour bucket."
+  id: Bytes!
+  campaign: Campaign!
+  "Unix timestamp of the start of the hour."
+  hourStart: BigInt!
+  visits: Int!
+  paid: BigInt!
+}
