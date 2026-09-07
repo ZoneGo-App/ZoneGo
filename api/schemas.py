@@ -32,6 +32,30 @@ class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
 
 
+class ScoreRequest(BaseModel):
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
+    campaign_id: int = Field(..., ge=0)
+
+
+class FeatureWeight(BaseModel):
+    name: str
+    value: float
+    # How much this feature pushed the score up. The Graph asks for the
+    # reasoning, not just the raw result, so we always hand back the three that
+    # mattered most rather than a lone number.
+    weight: float
+
+
+class ScoreResponse(BaseModel):
+    visitor: str
+    score: float = Field(..., ge=0, le=1)
+    threshold: float
+    # "pay" releases the reward, "hold" freezes it between VisitRecorded and
+    # RewardPaid. A hold is reversible: the visitor can appeal.
+    decision: str
+    top_features: list[FeatureWeight]
+
+
 class ClaimRequest(BaseModel):
     """Everything the visitor's phone read off the QR, plus who they are.
 
