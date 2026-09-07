@@ -133,8 +133,8 @@ def data_generate(n_businesses=50, n_neighbors=500, n_visits=20000, seed=42):
             'fraud_type': 'co_visit',
         }
 
-    # --- Pattern 3: Out-of-hours burst (unchanged: flips existing rows) ---
-    idx_p3 = np.random.choice(df.index, n_per_pattern, replace=False)
+    # Pattern 3: Out-of-hours burst (unchanged: flips existing rows)
+    idx_p3 = np.random.choice(df[df['is_fraud'] == 0].index, n_per_pattern, replace=False)
     for idx in idx_p3:
         df.loc[idx, 'is_fraud'] = 1
         df.loc[idx, 'fraud_type'] = 'out_of_hours'

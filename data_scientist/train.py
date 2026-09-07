@@ -8,6 +8,7 @@ from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import f1_score, recall_score
 from sklearn.dummy import DummyClassifier
 
+from sklearn.utils.class_weight import compute_sample_weight
 from events import load_events_from_csv, LABEL_COLUMN
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "visits.csv")
@@ -39,14 +40,15 @@ def build_features(events_df: pd.DataFrame, test_size=0.2, random_state=42):
 
     df = events_df.copy()
     df['hour'] = df['timestamp'].dt.hour
+    #Calculate the preceding time grouped by NULLIFIER (sorted strictly by nullifier and time).
+    df = df.sort_values(by=['nullifier', 'timestamp']).reset_index(drop=True)
+    df['previous_time'] = df.groupby('nullifier')['timestamp'].diff().dt.total_seconds().fillna(999999)#
+    #Calculate spatial displacements grouped by wallet (sorted by wallet and time).
     df = df.sort_values(by=['wallet', 'timestamp']).reset_index(drop=True)
-
-    # --- Sequential features: safe to compute on the whole df, they only
-    #     depend on each entity's own past, not on dataset-wide stats ---
-    df['previous_time'] = df.groupby('nullifier')['timestamp'].diff().dt.total_seconds().fillna(999999)
     df['lat_prev'] = df.groupby('wallet')['lat'].shift(1).fillna(df['lat'])
     df['lon_prev'] = df.groupby('wallet')['lon'].shift(1).fillna(df['lon'])
-    df['approx_distance'] = np.sqrt((df['lat'] - df['lat_prev']) ** 2 + (df['lon'] - df['lon_prev']) ** 2)
+    #Features derived from distance and speed
+    df['approx_distance'] = np.sqrt((df['lat'] - df['lat_prev']) ** 2 + ((df['lon'] - df['lon_prev']) * np.cos(np.radians(df['lat']))) ** 2)
     df['implied_velocity'] = df['approx_distance'] / (df['previous_time'] + 1)
     df['hour_window'] = df['timestamp'].dt.floor('h')
 
@@ -104,9 +106,12 @@ def train_and_evaluate():
     lr = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
     lr.fit(X_train, y_train)
     y_pred_lr = lr.predict(X_test)
-
+    #primary model responsible for learning complex fraud patterns 
+    # (such as impossible travel or coordinated visits) in order to distinguish 
+    # them from normal behavior.
     gb = GradientBoostingClassifier(random_state=42)
-    gb.fit(X_train, y_train)
+    sample_weights = compute_sample_weight('balanced', y_train)
+    gb.fit(X_train, y_train, sample_weight=sample_weights)
     y_pred_gb = gb.predict(X_test)
 
     print("\n3. Evaluating key metrics (Focus on Recall and F1-Macro):")
@@ -141,7 +146,33 @@ def pick_conclusion(results):
     best = max(candidates, key=lambda r: r[1])  # highest F1-macro
     discarded = [r for r in candidates if r is not best and r[1] <= baseline_f1]
 
-    return baseline_name, baseline_f1, best, discarded
+    # A case where the best model does not outperform the baseline
+    if best[1] <= baseline_f1:
+        conclusion_lines = [
+            f"**No usable model this run.** The best candidate "
+            f"(`{best[0]}`, F1-macro {best[1]:.4f}) does not beat the "
+            f"trivial baseline ({baseline_f1:.4f})."
+        ]
+        return baseline_name, baseline_f1, best, discarded, conclusion_lines
+
+    # Standard case where a recommended model exists.
+    conclusion_lines = [
+        f"**Recommended model: `{best[0]}`** — F1-macro {best[1]:.4f}, fraud recall {best[2]:.4f}."
+    ]
+    if discarded:
+        for name, f1_mac, recall in discarded:
+            verdict = "at or below" if f1_mac <= baseline_f1 else "close to"
+            conclusion_lines.append(
+                f"- `{name}` is **discarded**: its F1-macro ({f1_mac:.4f}) is {verdict} "
+                f"the trivial baseline ({baseline_f1:.4f}). In production this would "
+                f"freeze payouts for a large share of honest neighbors — not usable."
+            )
+    else:
+        conclusion_lines.append(
+            "- No other candidate underperformed the trivial baseline this run."
+        )
+
+    return baseline_name, baseline_f1, best, discarded, conclusion_lines
 
 
 def write_readme_ml(results, n_train, n_test, path=README_PATH):
@@ -155,26 +186,8 @@ def write_readme_ml(results, n_train, n_test, path=README_PATH):
         for name, f1_mac, recall in results
     )
 
-    baseline_name, baseline_f1, best, discarded = pick_conclusion(results)
-
-    conclusion_lines = [
-        f"**Recommended model: `{best[0]}`** — F1-macro {best[1]:.4f}, fraud recall {best[2]:.4f}."
-    ]
-    if discarded:
-        for name, f1_mac, recall in discarded:
-            verdict = (
-                "at or below" if f1_mac <= baseline_f1 else "close to"
-            )
-            conclusion_lines.append(
-                f"- `{name}` is **discarded**: its F1-macro ({f1_mac:.4f}) is {verdict} "
-                f"the trivial baseline ({baseline_f1:.4f}). In production this would "
-                f"freeze payouts for a large share of honest neighbors — not usable."
-            )
-    else:
-        conclusion_lines.append(
-            "- No other candidate underperformed the trivial baseline this run."
-        )
-
+    # Recibimos los 5 valores correctamente
+    baseline_name, baseline_f1, best, discarded, conclusion_lines = pick_conclusion(results)
     conclusion = "\n".join(conclusion_lines)
 
     content = f"""# Fraud Model Baseline — ZoneGo
