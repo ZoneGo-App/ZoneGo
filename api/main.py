@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import campaigns, health
+from api.routers import campaigns, health, search
 
 app = FastAPI(
     title="ZoneGo API",
@@ -18,3 +18,4 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(campaigns.router)
+app.include_router(search.router)
