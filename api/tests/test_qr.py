@@ -11,15 +11,24 @@ def test_sign_returns_a_payload_for_a_real_campaign():
     r = client.post("/qr/sign", json={"campaign_id": 1})
     assert r.status_code == 200
     body = r.json()
-    assert body["typed_data"]["primaryType"] == "Visit"
+    assert body["typed_data"]["primaryType"] == "VisitSig"
     assert body["typed_data"]["domain"]["chainId"] == 84532
 
 
-def test_payload_carries_the_campaign_geohash():
+def test_type_matches_the_contract_typehash():
+    """Guards the one string that has to be identical in VisitRegistry.sol."""
+    fields = client.post("/qr/sign", json={"campaign_id": 1}).json()
+    types = fields["typed_data"]["types"]["VisitSig"]
+    encoded = ",".join(f"{f['type']} {f['name']}" for f in types)
+    assert encoded == "uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash"
+
+
+def test_payload_carries_the_campaign_geohash_as_bytes32():
     r = client.post("/qr/sign", json={"campaign_id": 1})
     message = r.json()["typed_data"]["message"]
     assert message["campaignId"] == 1
-    assert message["geohash"].startswith("dr5r")
+    # "dr5rsked" in ASCII, right-padded with zeros to 32 bytes.
+    assert message["geohash"] == "0x" + b"dr5rsked".hex().ljust(64, "0")
 
 
 def test_the_visitor_is_not_in_the_signature():

@@ -12,15 +12,29 @@ The struct mirrors `VisitSig` in the contract. Any change here has to land in
 import secrets
 import time
 
-# `geohash` is a string until Sebastian settles bytes12 vs string in
-# schema/events.md. If it becomes bytes12, only this table and the payload
-# builder change — callers stay the same.
+# This mirrors VISIT_TYPEHASH in VisitRegistry.sol, character for character:
+#
+#   "VisitSig(uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash)"
+#
+# A single difference — a renamed field, a reordered one, string instead of
+# bytes32 — produces a different hash, the contract rejects the merchant's
+# signature, and nobody gets paid. Change this only alongside the contract.
+STRUCT_NAME = "VisitSig"
+
 VISIT_TYPE = [
     {"name": "campaignId", "type": "uint256"},
     {"name": "nonce", "type": "uint256"},
     {"name": "expiry", "type": "uint64"},
-    {"name": "geohash", "type": "string"},
+    {"name": "geohash", "type": "bytes32"},
 ]
+
+
+def geohash_to_bytes32(geohash: str) -> str:
+    """ASCII geohash right-padded with zeros, the way Solidity reads bytes32."""
+    raw = geohash.encode("ascii")
+    if len(raw) > 32:
+        raise ValueError("geohash does not fit in bytes32")
+    return "0x" + raw.hex().ljust(64, "0")
 
 
 def new_nonce() -> int:
@@ -48,9 +62,9 @@ def build_payload(
                 {"name": "chainId", "type": "uint256"},
                 {"name": "verifyingContract", "type": "address"},
             ],
-            "Visit": VISIT_TYPE,
+            STRUCT_NAME: VISIT_TYPE,
         },
-        "primaryType": "Visit",
+        "primaryType": STRUCT_NAME,
         "domain": {
             "name": "ZoneGo",
             "version": "1",
@@ -61,6 +75,6 @@ def build_payload(
             "campaignId": campaign_id,
             "nonce": nonce,
             "expiry": expiry,
-            "geohash": geohash,
+            "geohash": geohash_to_bytes32(geohash),
         },
     }
