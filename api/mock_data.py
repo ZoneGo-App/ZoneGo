@@ -10,6 +10,7 @@ Amounts are USDC minor units — 6 decimals, so 50_000 is five cents.
 from datetime import datetime, timedelta, timezone
 
 from api.geo import encode_geohash, zone_of
+from api.points import POINTS_NEW_MERCHANT, POINTS_PER_VISIT
 from api.schemas import Campaign, LeaderboardEntry
 from api.zones import zone_name
 
@@ -71,11 +72,18 @@ CAMPAIGNS = [
 
 
 def _entry(rank, address, visits, distinct=None, zone=None) -> LeaderboardEntry:
+    # Points follow the same rule the mappings apply: five a visit, five more
+    # the first time at each store.
+    points = None
+    if distinct is not None:
+        points = visits * POINTS_PER_VISIT + distinct * POINTS_NEW_MERCHANT
+
     return LeaderboardEntry(
         rank=rank,
         address=address,
         label=f"{address[:6]}…{address[-4:]}",
         visits=visits,
+        points=points,
         distinct_merchants=distinct,
         zone=zone,
         zone_name=zone_name(zone) if zone else None,

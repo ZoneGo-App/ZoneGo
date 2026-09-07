@@ -44,10 +44,18 @@ class LeaderboardEntry(BaseModel):
     computed without an index of the chain.
     """
     distinct_merchants: int | None = None
+    """
+    Five a visit, ten at a store new to them, nothing twice in a day at the
+    same one. Null on the merchant table: a merchant does not play, they are
+    the board.
+    """
+    points: int | None = None
     "Six-character geohash prefix. Null on a city-wide table."
     zone: str | None = None
     "What to print for that zone: 'Lower East Side' rather than 'dr5rsk'."
     zone_name: str | None = None
+    "Monday 00:00 UTC of the week shown. Null on the all-time table."
+    week_start: int | None = None
 
 
 class ScoreRequest(BaseModel):
