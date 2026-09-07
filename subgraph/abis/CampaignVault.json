@@ -4,6 +4,19 @@
     "inputs": [
       { "indexed": true, "internalType": "uint256", "name": "campaignId", "type": "uint256" },
       { "indexed": true, "internalType": "address", "name": "merchant", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "rewardPerVisit", "type": "uint256" },
+      { "indexed": false, "internalType": "uint256", "name": "dailyCap", "type": "uint256" },
+      { "indexed": false, "internalType": "bytes32", "name": "geohash", "type": "bytes32" },
+      { "indexed": false, "internalType": "uint256", "name": "radiusMeters", "type": "uint256" }
+    ],
+    "name": "CampaignCreated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "campaignId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "merchant", "type": "address" },
       { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
     ],
     "name": "CampaignFunded",

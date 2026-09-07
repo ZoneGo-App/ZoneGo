@@ -12,6 +12,28 @@ export const ZERO = BigInt.fromI32(0);
 export const HOUR = BigInt.fromI32(3600);
 export const NO_MERCHANT = Address.zero();
 
+// Six characters of geohash: a cell about 1200 x 600 metres. Small enough
+// that being first in your zone is something a person can actually do, and it
+// needs no map data — the zone is already inside the campaign's geohash.
+export const ZONE_PRECISION = 6;
+
+/**
+ * Zone of a bytes32 geohash. The chain stores ASCII right-padded with zeros,
+ * so this reads characters until the padding starts. An unset geohash — a
+ * campaign we only ever saw funded, never created — gives an empty zone
+ * rather than a wrong one.
+ */
+export function zoneOf(geohash: Bytes): string {
+  let out = "";
+  for (let i = 0; i < ZONE_PRECISION; i++) {
+    if (i >= geohash.length || geohash[i] == 0) {
+      return "";
+    }
+    out += String.fromCharCode(geohash[i]);
+  }
+  return out;
+}
+
 export function campaignKey(campaignId: BigInt): Bytes {
   return Bytes.fromByteArray(ByteArray.fromBigInt(campaignId));
 }
@@ -48,8 +70,8 @@ export function loadVisitor(address: Address, timestamp: BigInt): Visitor {
 /**
  * A campaign should be born from CampaignCreated. The contract does not emit
  * that event yet, so we create a shell the first time a campaign is mentioned
- * and fill in what the event carries. Reward, cap, radius and geohash keep
- * their zero defaults: visibly empty rather than quietly wrong.
+ * and fill in what the event carries. Reward, cap, radius, geohash and zone
+ * keep their empty defaults: visibly missing rather than quietly wrong.
  *
  * `merchant` is Address.zero() when the event does not name one — VisitRecorded
  * carries only the campaign, so the owner is whatever CampaignFunded recorded.
@@ -69,6 +91,9 @@ export function loadCampaign(
     campaign.rewardPerVisit = ZERO;
     campaign.dailyCap = 0;
     campaign.geohash = Bytes.empty();
+    // A campaign with no zone stays out of the zone leaderboard instead of
+    // being dropped into the wrong one.
+    campaign.zone = "";
     campaign.radiusMeters = 0;
     campaign.balance = ZERO;
     campaign.active = true;

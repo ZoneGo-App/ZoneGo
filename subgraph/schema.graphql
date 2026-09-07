@@ -30,6 +30,13 @@ type Campaign @entity(immutable: false) {
   dailyCap: Int!
   "ASCII geohash of the store, right-padded — the same value the merchant signs."
   geohash: Bytes!
+  """
+  First six characters of the geohash: a cell about 1200 x 600 metres, which
+  is roughly a neighbourhood. Stored rather than derived because GraphQL
+  cannot filter or group on a string prefix, and the zone leaderboard needs
+  both. It costs nothing to compute in the mapping.
+  """
+  zone: String!
   radiusMeters: Int!
   "Everything funded so far, minus everything paid out."
   balance: BigInt!
@@ -76,6 +83,8 @@ type Visit @entity(immutable: true) {
   nullifierHash: Bytes!
   "Hash of the merchant signature that authorised this visit."
   sigHash: Bytes!
+  "Copied from the campaign so the zone leaderboard is one query, not two."
+  zone: String!
   timestamp: BigInt!
   blockNumber: BigInt!
   transactionHash: Bytes!

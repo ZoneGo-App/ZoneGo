@@ -27,9 +27,13 @@ dataSources:
         - name: CampaignVault
           file: ./abis/CampaignVault.json
       eventHandlers:
-        # TODO: CampaignCreated goes here once the contract emits it. Without
-        # it a campaign is only discovered when it is first funded, so reward,
-        # cap, radius and geohash stay unknown to the index.
+        # CampaignCreated is not emitted by the contract yet. The ABI matches
+        # the shape agreed in schema/events.md, so indexing starts working the
+        # day Sebastian adds it, with no change here. Until then a campaign is
+        # only discovered when it is funded, and its reward, cap, radius and
+        # zone stay empty.
+        - event: CampaignCreated(indexed uint256,indexed address,uint256,uint256,bytes32,uint256)
+          handler: handleCampaignCreated
         - event: CampaignFunded(indexed uint256,indexed address,uint256)
           handler: handleCampaignFunded
 

@@ -31,6 +31,7 @@ export function handleVisitRecorded(event: VisitRecorded): void {
   visit.merchant = merchant.id;
   visit.nullifierHash = event.params.nullifierHash;
   visit.sigHash = event.params.sigHash;
+  visit.zone = campaign.zone;
   visit.timestamp = timestamp;
   visit.blockNumber = event.block.number;
   visit.transactionHash = event.transaction.hash;
