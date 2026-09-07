@@ -26,3 +26,16 @@ class Campaign(BaseModel):
 class SearchHit(BaseModel):
     campaign: Campaign
     distance_meters: int = Field(..., ge=0)
+
+
+class QrSignRequest(BaseModel):
+    campaign_id: int = Field(..., ge=0)
+
+
+class QrSignResponse(BaseModel):
+    # The full EIP-712 document the merchant wallet signs. Handed over as-is so
+    # the frontend passes it straight to the wallet without rebuilding it.
+    typed_data: dict
+    nonce: int
+    expiry: int
+    rotate_after_seconds: int
