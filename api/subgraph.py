@@ -54,6 +54,23 @@ query Campaign($id: Bytes!) {{
 }}
 """
 
+# Everyone who was seen inside one epoch. Ordered by timestamp so the page we
+# take is the earliest slice of the window rather than an arbitrary one — an
+# epoch has to be rebuildable to the same root by anyone who asks.
+VISITORS_BETWEEN = """
+query VisitorsBetween($start: BigInt!, $end: BigInt!, $first: Int!, $skip: Int!) {
+  visits(
+    where: { timestamp_gte: $start, timestamp_lt: $end }
+    orderBy: timestamp
+    orderDirection: asc
+    first: $first
+    skip: $skip
+  ) {
+    visitor { id }
+  }
+}
+"""
+
 # Query result cache. A merchant panel and a search page hit the same campaign
 # list within the same second; a few seconds of staleness is invisible to a
 # person walking down a street, and it keeps us inside the Studio rate limit.
@@ -133,3 +150,28 @@ def get_campaign(campaign_id: int) -> Campaign | None:
         key = "0x0" + key[2:]
     node = run(GET_CAMPAIGN, {"id": key}).get("campaign")
     return to_campaign(node) if node else None
+
+
+# The Graph caps a page at 1000 rows whatever we ask for.
+PAGE = 1000
+
+
+def visitors_between(start: int, end: int) -> list[str]:
+    """Distinct wallets with a visit in [start, end), lowercased and sorted.
+
+    Paged to the end rather than capped: an epoch that silently dropped its
+    thousandth visitor would commit a root that leaves that person unable to
+    prove their own score, which is the one thing this must never do.
+    """
+    seen: set[str] = set()
+    skip = 0
+    while True:
+        rows = run(
+            VISITORS_BETWEEN,
+            {"start": str(start), "end": str(end), "first": PAGE, "skip": skip},
+        ).get("visits", [])
+        for row in rows:
+            seen.add(row["visitor"]["id"].lower())
+        if len(rows) < PAGE:
+            return sorted(seen)
+        skip += PAGE
