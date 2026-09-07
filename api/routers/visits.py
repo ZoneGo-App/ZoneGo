@@ -16,6 +16,7 @@ import time
 from fastapi import APIRouter, HTTPException
 
 from api.config import get_config
+from api.eip712 import geohash_to_bytes32
 from api.mock_data import CAMPAIGNS
 from api.schemas import ClaimRequest, ClaimResponse
 
@@ -41,6 +42,10 @@ def claim(req: ClaimRequest):
         raise HTTPException(409, "Campaign is not active")
     if campaign.balance < campaign.reward_per_visit:
         raise HTTPException(409, "Campaign is out of funds")
+    if req.geohash.lower() != geohash_to_bytes32(campaign.geohash).lower():
+        # A signature carrying another store's geohash was never going to pass
+        # the contract. Catching it costs nothing; relaying it costs gas.
+        raise HTTPException(409, "Geohash does not belong to this campaign")
 
     config = get_config()
     if not config.mock_mode:

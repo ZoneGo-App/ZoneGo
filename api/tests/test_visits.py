@@ -53,6 +53,12 @@ def test_unknown_campaign_returns_404():
     assert r.status_code == 404
 
 
+def test_a_geohash_from_another_store_is_refused():
+    elsewhere = "0x" + b"dr5rsm47".hex().ljust(64, "0")
+    r = client.post("/visits/claim", json=a_claim(geohash=elsewhere))
+    assert r.status_code == 409
+
+
 def test_the_same_claim_is_idempotent_in_mock_mode():
     a = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
     b = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
