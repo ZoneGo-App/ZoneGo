@@ -1,9 +1,16 @@
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Config(BaseSettings):
+    # Read from a .env in the working directory, so running uvicorn by hand
+    # picks up the same values docker compose already substitutes. Real
+    # environment variables still win, which is what a deployment sets.
+    # `extra="ignore"` because that file is shared with compose and holds keys
+    # this class has never heard of.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     mock_mode: bool = True
     rpc_url: str = ""
     subgraph_url: str = ""
