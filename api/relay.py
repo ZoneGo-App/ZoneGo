@@ -43,9 +43,9 @@ VISIT_REGISTRY_ABI = [
                     {"name": "nonce", "type": "uint256"},
                     {"name": "expiry", "type": "uint64"},
                     {"name": "geohash", "type": "bytes32"},
+                    {"name": "visitor", "type": "address"},
                 ],
             },
-            {"name": "visitor", "type": "address"},
             {"name": "signature", "type": "bytes"},
             {"name": "nullifierHash", "type": "bytes32"},
         ],
@@ -103,9 +103,17 @@ def send_claim(claim: Claim) -> str:
         abi=VISIT_REGISTRY_ABI,
     )
 
+    # The visitor travels inside the signed struct now, not beside it. The
+    # relay cannot swap it for an address of its own without the merchant's
+    # signature failing to recover — which is the point.
     call = registry.functions.claim(
-        (claim.campaign_id, claim.nonce, claim.expiry, _bytes(claim.geohash)),
-        Web3.to_checksum_address(claim.visitor),
+        (
+            claim.campaign_id,
+            claim.nonce,
+            claim.expiry,
+            _bytes(claim.geohash),
+            Web3.to_checksum_address(claim.visitor),
+        ),
         _bytes(claim.signature),
         _bytes(claim.nullifier_hash),
     )
