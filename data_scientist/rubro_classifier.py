@@ -230,5 +230,28 @@ def train_rubro_classifier(random_state=42, test_size=0.25):
     # merchant text. This is exactly what a judge would test live.
     ood_results = evaluate_out_of_distribution(pipeline)
 
-    def evaluate_out_of_distribution():
-        return
+    _OOD_EXAMPLES = [
+    "We sell running sneakers and athletic wear",
+    "zapatillas y ropa deportiva",
+    "flowers and plants for your home",
+    "I fix phones and sell chargers",
+    "tattoo studio, walk ins welcome",
+    "we sell bicycles and do repairs",
+    "pharmacy, prescriptions and vitamins",
+    "pet grooming and dog food",
+]
+
+    def evaluate_out_of_distribution(pipeline):
+        """Runs the held-out OOD examples through the confidence-thresholded
+    predict_rubro logic and returns (text, predicted_label, confidence)
+    tuples, so the report can show this transparently instead of hiding it
+    behind an in-distribution accuracy number."""
+        
+        results = []
+        for text in _OOD_EXAMPLES:
+            proba = pipeline.predict_proba([text])[0]
+            classes = pipeline.classes_
+            best_idx = int(np.argmax(proba))
+            label = classes[best_idx] if proba[best_idx]>= CONFIDENCE_THRESHOLD else OTHER_LABEL
+            results.append((text, label, float(proba[best_idx])))
+        return results
