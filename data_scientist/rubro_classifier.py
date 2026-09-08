@@ -241,17 +241,82 @@ def train_rubro_classifier(random_state=42, test_size=0.25):
     "pet grooming and dog food",
 ]
 
-    def evaluate_out_of_distribution(pipeline):
-        """Runs the held-out OOD examples through the confidence-thresholded
+def evaluate_out_of_distribution(pipeline):
+    """Runs the held-out OOD examples through the confidence-thresholded
     predict_rubro logic and returns (text, predicted_label, confidence)
     tuples, so the report can show this transparently instead of hiding it
     behind an in-distribution accuracy number."""
         
-        results = []
-        for text in _OOD_EXAMPLES:
-            proba = pipeline.predict_proba([text])[0]
-            classes = pipeline.classes_
-            best_idx = int(np.argmax(proba))
-            label = classes[best_idx] if proba[best_idx]>= CONFIDENCE_THRESHOLD else OTHER_LABEL
-            results.append((text, label, float(proba[best_idx])))
-        return results
+    results = []
+    for text in _OOD_EXAMPLES:
+        proba = pipeline.predict_proba([text])[0]
+        classes = pipeline.classes_
+        best_idx = int(np.argmax(proba))
+        label = classes[best_idx] if proba[best_idx]>= CONFIDENCE_THRESHOLD else OTHER_LABEL
+        results.append((text, label, float(proba[best_idx])))
+    return results
+
+
+def write_report(acc, f1_mac, report, ood_results, n_train, n_test, path=REPORT_PATH):
+    ood_lines = "\n".join(
+        f'| "{text}" | `{label}` | {conf:.2f} |' for text, label, conf in ood_results
+    )
+
+    content = f"""# Rubro Classifier — ZoneGo
+
+TF-IDF (word 1-2 grams) + Logistic Regression, trained on a synthetic
+phrase bank ({len(DESCRIPTIONS)} categories: {", ".join(DESCRIPTIONS.keys())},
+the last one being an explicit catch-all). NOT real merchant text yet —
+see ml/DATA.md for why this project uses synthetic data and how it gets
+swapped for real data later.
+
+Train: {n_train} phrases · Test: {n_test} phrases.
+
+## In-distribution metrics
+
+- **Accuracy**: {acc:.4f}
+- **F1-Macro**: {f1_mac:.4f}
+
+```
+{report}
+```
+
+**These numbers are measured on phrases from the same synthetic phrase
+bank used for training (same style, same vocabulary). They are NOT an
+estimate of performance on real merchant-typed text — see the
+out-of-distribution table below, which is.**
+
+## Known limitation — out-of-distribution text
+
+A confidence threshold ({CONFIDENCE_THRESHOLD}) on `predict_proba()` now
+routes anything the model isn't sure about to `other`, instead of forcing
+it into the nearest-scoring wrong category. Tested on 8 real-sounding
+descriptions of businesses outside the 8 rubros — none seen in training:
+
+| Description | Predicted | Confidence |
+|---|---|---|
+{ood_lines}
+
+If any row above shows a specific rubro (not `other`) with high confidence,
+that is a real miss worth expanding the `other` phrase bank for, not a
+threshold-tuning problem.
+
+## Why this model, and what it's for
+
+This is a cheap classifier that turns a merchant's free-text self-
+description into a normalized category. It feeds the search filter: a
+neighbor searching "coffee near me" gets matched by category even if the
+merchant typed something free-form like "cafe with wifi and pastries"
+instead of picking from a dropdown. Text that doesn't confidently match
+any of the 8 rubros returns `other` instead of a wrong guess.
+
+Usage:
+
+```python
+from rubro_classifier import predict_rubro
+predict_rubro("We sell empanadas, coffee, and pastries every morning")
+```
+"""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+    print(f"Report committed to {path}")
