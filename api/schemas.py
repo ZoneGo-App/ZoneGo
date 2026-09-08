@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+from api.points import unix_day
 
 
 class Campaign(BaseModel):
@@ -25,6 +27,31 @@ class Campaign(BaseModel):
     # happened. Left empty instead of guessed, so a caller can tell which of
     # the two answered.
     created_at: datetime | None = None
+    """
+    The one day a week this store pays double, as a unix day number — the same
+    integer the contract compares, so no timezone can disagree about whether a
+    campaign was doubling.
+
+    Every store pays the same base reward. This is the only lever a merchant
+    has, and it is the same lever for all of them: one day, twice the reward.
+    A store cannot outbid the shop next door, which is the whole point — the
+    visitor picks a route by walking distance and by what they have not
+    discovered yet, not by who paid the most.
+
+    Null until the contract carries the field.
+    """
+    boost_day: int | None = None
+
+    @computed_field
+    @property
+    def pays_double_today(self) -> bool:
+        return self.boost_day is not None and self.boost_day == unix_day()
+
+    @computed_field
+    @property
+    def reward_today(self) -> int:
+        """What a visit is worth right now. This is the number to show."""
+        return self.reward_per_visit * 2 if self.pays_double_today else self.reward_per_visit
 
 
 class SearchHit(BaseModel):
