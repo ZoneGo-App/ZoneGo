@@ -20,12 +20,10 @@ contract VisitRegistryTest is Test {
     uint256 merchantKey = 0xA11CE;
     address merchant;
     address visitor = address(0x2);
-
     uint256 campaignId;
 
     function setUp() public {
         merchant = vm.addr(merchantKey);
-
         usdc = new MockUSDC();
         vault = new CampaignVault(address(usdc));
         registry = new VisitRegistry(address(vault));
@@ -55,7 +53,9 @@ contract VisitRegistryTest is Test {
 
     function _sign(VisitRegistry.VisitSig memory sig, uint256 signerKey) internal view returns (bytes memory) {
         bytes32 structHash = keccak256(
-            abi.encode(registry.VISIT_TYPEHASH(), sig.campaignId, sig.nonce, sig.expiry, sig.geohash)
+            abi.encode(
+                registry.VISIT_TYPEHASH(), sig.campaignId, sig.nonce, sig.expiry, sig.geohash, sig.visitor
+            )
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", _domainSeparator(), structHash));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
@@ -67,14 +67,14 @@ contract VisitRegistryTest is Test {
             campaignId: campaignId,
             nonce: 1,
             expiry: uint64(block.timestamp + 1 hours),
-            geohash: bytes32(0)
+            geohash: bytes32(0),
+            visitor: visitor
         });
         bytes memory signature = _sign(sig, merchantKey);
-
-        registry.claim(sig, visitor, signature, keccak256("human-1"));
+        registry.claim(sig, signature, keccak256("human-1"));
 
         vm.expectRevert(VisitRegistry.NonceAlreadyUsed.selector);
-        registry.claim(sig, visitor, signature, keccak256("human-1"));
+        registry.claim(sig, signature, keccak256("human-1"));
     }
 
     function test_DecreasingCurvePaysCorrectAmounts() public {
@@ -86,14 +86,14 @@ contract VisitRegistryTest is Test {
                 campaignId: campaignId,
                 nonce: i + 1,
                 expiry: uint64(block.timestamp + 1 hours),
-                geohash: bytes32(0)
+                geohash: bytes32(0),
+                visitor: visitor
             });
             bytes memory signature = _sign(sig, merchantKey);
 
             uint256 balanceBefore = usdc.balanceOf(visitor);
-            registry.claim(sig, visitor, signature, nullifier);
+            registry.claim(sig, signature, nullifier);
             uint256 paid = usdc.balanceOf(visitor) - balanceBefore;
-
             assertEq(paid, expectedAmounts[i], "wrong amount for visit");
         }
     }
@@ -103,12 +103,13 @@ contract VisitRegistryTest is Test {
             campaignId: campaignId,
             nonce: 1,
             expiry: uint64(block.timestamp == 0 ? 0 : block.timestamp - 1),
-            geohash: bytes32(0)
+            geohash: bytes32(0),
+            visitor: visitor
         });
         bytes memory signature = _sign(sig, merchantKey);
 
         vm.expectRevert(VisitRegistry.SignatureExpired.selector);
-        registry.claim(sig, visitor, signature, keccak256("human-1"));
+        registry.claim(sig, signature, keccak256("human-1"));
     }
 
     function test_WrongSignerReverts() public {
@@ -116,13 +117,13 @@ contract VisitRegistryTest is Test {
             campaignId: campaignId,
             nonce: 1,
             expiry: uint64(block.timestamp + 1 hours),
-            geohash: bytes32(0)
+            geohash: bytes32(0),
+            visitor: visitor
         });
-
         uint256 wrongKey = 0xBAD;
         bytes memory badSignature = _sign(sig, wrongKey);
 
         vm.expectRevert(VisitRegistry.BadSig.selector);
-        registry.claim(sig, visitor, badSignature, keccak256("human-1"));
+        registry.claim(sig, badSignature, keccak256("human-1"));
     }
 }

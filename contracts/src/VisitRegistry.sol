@@ -22,10 +22,11 @@ contract VisitRegistry is EIP712 {
         uint256 nonce;
         uint64 expiry;
         bytes32 geohash;
+        address visitor;
     }
 
     bytes32 public constant VISIT_TYPEHASH = keccak256(
-        "VisitSig(uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash)"
+        "VisitSig(uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash,address visitor)"
     );
 
     mapping(address => mapping(uint256 => bool)) public usedNonce;
@@ -42,7 +43,7 @@ contract VisitRegistry is EIP712 {
         VAULT = CampaignVault(vault);
     }
 
-    function claim(VisitSig calldata sig, address visitor, bytes calldata signature, bytes32 nullifierHash)
+    function claim(VisitSig calldata sig, bytes calldata signature, bytes32 nullifierHash)
         external
     {
         if (block.timestamp > sig.expiry) revert SignatureExpired();
@@ -52,7 +53,7 @@ contract VisitRegistry is EIP712 {
         if (usedNonce[merchant][sig.nonce]) revert NonceAlreadyUsed();
 
         bytes32 structHash = keccak256(
-            abi.encode(VISIT_TYPEHASH, sig.campaignId, sig.nonce, sig.expiry, sig.geohash)
+            abi.encode(VISIT_TYPEHASH, sig.campaignId, sig.nonce, sig.expiry, sig.geohash, sig.visitor)
         );
         address recovered = ECDSA.recover(_hashTypedDataV4(structHash), signature);
         if (recovered != merchant) revert BadSig();
@@ -75,10 +76,10 @@ contract VisitRegistry is EIP712 {
             if (spentToday > dailyCap) revert DailyCapExceeded();
             dailySpent[dayKey] = spentToday;
 
-            VAULT.payReward(sig.campaignId, visitor, amount);
-            emit RewardPaid(sig.campaignId, visitor, amount);
+            VAULT.payReward(sig.campaignId, sig.visitor, amount);
+            emit RewardPaid(sig.campaignId, sig.visitor, amount);
         }
 
-        emit VisitRecorded(sig.campaignId, visitor, nullifierHash, uint64(block.timestamp), keccak256(signature));
+        emit VisitRecorded(sig.campaignId, sig.visitor, nullifierHash, uint64(block.timestamp), keccak256(signature));
     }
 }
