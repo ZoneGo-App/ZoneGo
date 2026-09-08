@@ -1,14 +1,9 @@
 """
 Canonical visit-event schema for ZoneGo's fraud pipeline.
-
-The whole point of freezing this schema (Día 1 of the plan) is that
-`build_features()` in train.py never has to change when the data source
-changes. Today the only loader is the synthetic CSV; once Lucio's subgraph
-(Día 4) is live, `load_events_from_subgraph()` becomes the real loader and
-nothing downstream is touched, because both return the exact same columns.
 """
 
 import pandas as pd
+import requests
 
 # Every event, regardless of source, must be normalized to exactly these
 # columns before it reaches build_features(). `lat`/`lon` are resolved from
@@ -31,6 +26,21 @@ EVENT_SCHEMA = [
 # this until fraud is confirmed some other way (see ml/DATA.md, section 3).
 LABEL_COLUMN = "is_fraud"
 
+_VISITS_QUERY= """
+query GetVisits($first: Int!, $skip: Int!) {
+  visits(first: $first, skip: $skip, orderBy: timestamp, orderDirection: asc) {
+    id
+    visitor { id }
+    merchant { id }
+    nullifierHash
+    timestamp
+    campaign { geohash }
+  }
+}
+"""
+
+
+
 
 def _validate_schema(df: pd.DataFrame, require_label: bool = False) -> None:
     required = list(EVENT_SCHEMA) + ([LABEL_COLUMN] if require_label else [])
@@ -40,12 +50,7 @@ def _validate_schema(df: pd.DataFrame, require_label: bool = False) -> None:
 
 
 def load_events_from_csv(path: str, require_label: bool = True) -> pd.DataFrame:
-    """Adapter: synthetic/exported CSV -> canonical event schema.
-
-    This is today's only data source (generate.py's output). It exists so
-    the CSV's column names/order are an implementation detail of ONE loader,
-    never something build_features() depends on directly.
-    """
+    """Adapter: synthetic/exported CSV -> canonical event schema."""
     df = pd.read_csv(path)
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     _validate_schema(df, require_label=require_label)
@@ -53,17 +58,52 @@ def load_events_from_csv(path: str, require_label: bool = True) -> pd.DataFrame:
     return df[cols].copy()
 
 
-def load_events_from_subgraph(subgraph_url: str, query: str = None) -> pd.DataFrame:
-    """Adapter stub: subgraph (GraphQL) -> canonical event schema.
+def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_pages: int = 50) -> pd.DataFrame:
+    """Adapter stub: subgraph (GraphQL) -> canonical event schema."""
 
-    Not wired to a live endpoint yet — that lands on Día 4 once Lucio
-    deploys the subgraph and this can run a real GraphQL query against
-    `Visit` entities. Kept here, with the same return contract as
-    load_events_from_csv(), so that day only this function changes:
-    build_features() and every model downstream stay exactly as they are.
-    """
-    raise NotImplementedError(
-        "Subgraph querying is scheduled for Día 4 of the plan. When wired up, "
-        "this must return a DataFrame with columns: " + ", ".join(EVENT_SCHEMA) +
-        " (no `is_fraud` column — real events aren't labeled yet)."
-    )
+    rows=[]
+    for page in range(max_pages):
+        skip =page*page_size
+        resp = requests.post(
+            subgraph_url,
+            json={"query": _VISITS_QUERY, "variables": {"first":page_size, "skip":skip}},
+            timeout=30
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+        if "errors" in payload:
+            raise RuntimeError(f"Subgraph returned errors: {payload['errors']}")
+        visits = payload.get("data", {}).get("visits", [])
+        if not visits:
+            break
+        for v in visits:
+            merchant = v.get("merchant") or {}
+            campaign = v.get("campaign") or {}
+            
+            # Decodificación del geohash de la campaña para obtener lat/lon
+            lat, lon = 0.0, 0.0
+            raw_geohash = campaign.get("geohash")
+            if raw_geohash:
+                try:
+                    from utils import decode_geohash
+                    lat, lon = decode_geohash(raw_geohash)
+                except ImportError:
+                    pass  # Si la función está en otro módulo, ajústala aquí
+
+            rows.append({
+                "visit_id": v.get("id"),
+                "wallet": v.get("visitor", {}).get("id"),
+                "nullifier": v.get("nullifierHash"),
+                "business_id": merchant.get("id", "unknown"),
+                "business_type": "unknown",  # No viene en cadena por ahora
+                "lat": float(lat),
+                "lon": float(lon),
+                "timestamp": pd.to_datetime(int(v.get("timestamp", 0)), unit="s"),
+            })
+
+        if len(visits) < page_size:
+            break  # Última página
+
+    df = pd.DataFrame(rows, columns=EVENT_SCHEMA)
+    _validate_schema(df, require_label=False)
+    return df
