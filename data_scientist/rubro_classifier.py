@@ -320,3 +320,41 @@ predict_rubro("We sell empanadas, coffee, and pastries every morning")
     with open(path, "w", encoding="utf-8") as f:
         f.write(content)
     print(f"Report committed to {path}")
+
+
+def predict_rubro(text: str, threshold: float = CONFIDENCE_THRESHOLD) -> str:
+    """Loads the trained pipeline and predicts a rubro for a free-text
+    description, or "other" if no category clears `threshold`. Trains and
+    saves the model on first use if it doesn't exist yet.
+
+    FIX (Problem #1, mitigation a): this is the cheap, high-leverage fix.
+    Even with the "other" training category added, predict_proba() +
+    threshold is what stops a low-confidence guess from being served as a
+    normalized rubro to the search filter.
+    """
+    if not os.path.exists(MODEL_PATH):
+        train_rubro_classifier()
+    pipeline = joblib.load(MODEL_PATH)
+
+    proba = pipeline.predict_proba([text])[0]
+    classes = pipeline.classes_
+    best_idx = int(np.argmax(proba))
+
+    if proba[best_idx] < threshold:
+        return OTHER_LABEL
+    return classes[best_idx]
+
+
+if __name__ == "__main__":
+    train_rubro_classifier()
+
+    examples = [
+        "We sell empanadas, coffee, and pastries every morning",
+        "Wash and fold service, same day, open on weekends",
+        "Fresh cut fades and beard trims, walk ins welcome",
+        "We sell running sneakers and socks",  # out-of-distribution
+        "flowers and plants for your home",     # out-of-distribution
+    ]
+    print("\nExample predictions:")
+    for text in examples:
+        print(f"  '{text}' -> {predict_rubro(text)}")
