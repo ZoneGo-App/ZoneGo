@@ -1,0 +1,156 @@
+# The only source of visit history in ZoneGo.
+#
+# Nothing here is computed by our servers: the leaderboard, the merchant panel
+# and the fraud model all read these entities, so anyone can verify their own
+# numbers against the chain without trusting us. That is what makes The Graph
+# load-bearing here rather than decorative.
+#
+# Counters are kept on the entities instead of being summed at query time. A
+# merchant panel that adds up ten thousand visits in the browser is slow, and
+# the leaderboard has to sort by a stored field to be paginated at all.
+
+type Merchant @entity(immutable: false) {
+  "The merchant wallet address."
+  id: Bytes!
+  campaigns: [Campaign!]! @derivedFrom(field: "merchant")
+  visits: [Visit!]! @derivedFrom(field: "merchant")
+  "Drives the most-visited stores leaderboard."
+  visitCount: Int!
+  totalPaid: BigInt!
+  firstSeenAt: BigInt!
+}
+
+type Campaign @entity(immutable: false) {
+  "The campaign id, as bytes."
+  id: Bytes!
+  campaignId: BigInt!
+  merchant: Merchant!
+  "USDC minor units paid per verified visit, before the protocol fee."
+  rewardPerVisit: BigInt!
+  dailyCap: Int!
+  "ASCII geohash of the store, right-padded — the same value the merchant signs."
+  geohash: Bytes!
+  """
+  First six characters of the geohash: a cell about 1200 x 600 metres, which
+  is roughly a neighbourhood. Stored rather than derived because GraphQL
+  cannot filter or group on a string prefix, and the zone leaderboard needs
+  both. It costs nothing to compute in the mapping.
+  """
+  zone: String!
+  radiusMeters: Int!
+  "Everything funded so far, minus everything paid out."
+  balance: BigInt!
+  active: Boolean!
+  createdAt: BigInt!
+  visits: [Visit!]! @derivedFrom(field: "campaign")
+  visitCount: Int!
+  totalPaid: BigInt!
+}
+
+type Visitor @entity(immutable: false) {
+  "The visitor wallet address."
+  id: Bytes!
+  "World nullifier bound to this wallet. Null until they verify."
+  nullifierHash: Bytes
+  visits: [Visit!]! @derivedFrom(field: "visitor")
+  "Drives the explorer leaderboard."
+  visitCount: Int!
+  """
+  How many different stores they have been to. This is the number the
+  discovery bonus rewards, and it cannot be derived without an index.
+  """
+  distinctMerchants: Int!
+  """
+  Five a visit, ten when the store is new to them, nothing for a second visit
+  to the same store on the same day. Counted here rather than by our server,
+  so a player can check their own score against the chain.
+  """
+  points: Int!
+  totalEarned: BigInt!
+  firstSeenAt: BigInt!
+}
+
+type VisitorWeek @entity(immutable: false) {
+  "Visitor address followed by the start of the week."
+  id: Bytes!
+  visitor: Visitor!
+  "Monday 00:00 UTC of that week, as a unix timestamp."
+  weekStart: BigInt!
+  points: Int!
+  visits: Int!
+  newMerchants: Int!
+}
+
+type MerchantWeek @entity(immutable: false) {
+  "Merchant address followed by the start of the week."
+  id: Bytes!
+  merchant: Merchant!
+  weekStart: BigInt!
+  visits: Int!
+  paid: BigInt!
+}
+
+type VisitorMerchant @entity(immutable: false) {
+  "Visitor address followed by merchant address."
+  id: Bytes!
+  visitor: Visitor!
+  merchant: Merchant!
+  visits: Int!
+  firstVisitAt: BigInt!
+  """
+  Day of the last visit that scored here, as a unix day number. A second visit
+  to the same store on the same day pays nothing and scores nothing — this is
+  what makes that rule checkable from the chain.
+  """
+  lastScoredDay: BigInt!
+}
+
+type Visit @entity(immutable: true) {
+  "Transaction hash and log index."
+  id: Bytes!
+  campaign: Campaign!
+  visitor: Visitor!
+  "Denormalised so the store leaderboard does not have to walk campaigns."
+  merchant: Merchant!
+  nullifierHash: Bytes!
+  "Hash of the merchant signature that authorised this visit."
+  sigHash: Bytes!
+  "Copied from the campaign so the zone leaderboard is one query, not two."
+  zone: String!
+  "What this visit scored: 10 for a new store, 5 for a known one, 0 same day."
+  points: Int!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Reward @entity(immutable: true) {
+  id: Bytes!
+  campaign: Campaign!
+  visitor: Visitor!
+  amount: BigInt!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Epoch @entity(immutable: true) {
+  "The epoch number, as bytes."
+  id: Bytes!
+  epoch: BigInt!
+  """
+  Merkle root of (wallet, fraud score) pairs committed for this epoch.
+  Published on chain so a score cannot be rewritten after the fact.
+  """
+  merkleRoot: Bytes!
+  timestamp: BigInt!
+}
+
+type CampaignHour @entity(immutable: false) {
+  "Campaign id and the hour bucket."
+  id: Bytes!
+  campaign: Campaign!
+  "Unix timestamp of the start of the hour."
+  hourStart: BigInt!
+  visits: Int!
+  paid: BigInt!
+}
