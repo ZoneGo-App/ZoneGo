@@ -33,6 +33,7 @@ def sign(req: QrSignRequest):
     payload = build_payload(
         campaign_id=campaign.campaign_id,
         geohash=campaign.geohash,
+        visitor=req.visitor,
         chain_id=config.chain_id,
         verifying_contract=config.visit_registry_address,
         signature_ttl_seconds=config.signature_ttl_seconds,

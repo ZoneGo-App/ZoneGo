@@ -34,6 +34,10 @@ class SearchHit(BaseModel):
 
 class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
+    # Inside the signed struct, so a payload is good for one person only. The
+    # merchant's screen can no longer hold a signature waiting for whoever
+    # walks up: the address has to arrive before the wallet signs.
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
 
 
 class LeaderboardEntry(BaseModel):

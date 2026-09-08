@@ -14,11 +14,16 @@ import time
 
 # This mirrors VISIT_TYPEHASH in VisitRegistry.sol, character for character:
 #
-#   "VisitSig(uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash)"
+#   "VisitSig(uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash,address visitor)"
 #
 # A single difference — a renamed field, a reordered one, string instead of
 # bytes32 — produces a different hash, the contract rejects the merchant's
 # signature, and nobody gets paid. Change this only alongside the contract.
+#
+# `visitor` is signed rather than passed alongside. Without it inside the
+# struct, anyone holding the signature could call claim() with their own
+# address and take the reward — and the signature is on a screen in a shop,
+# so "anyone holding it" means anyone who walked past.
 STRUCT_NAME = "VisitSig"
 
 VISIT_TYPE = [
@@ -26,6 +31,7 @@ VISIT_TYPE = [
     {"name": "nonce", "type": "uint256"},
     {"name": "expiry", "type": "uint64"},
     {"name": "geohash", "type": "bytes32"},
+    {"name": "visitor", "type": "address"},
 ]
 
 
@@ -57,11 +63,19 @@ def build_payload(
     *,
     campaign_id: int,
     geohash: str,
+    visitor: str,
     chain_id: int,
     verifying_contract: str,
     signature_ttl_seconds: int,
     nonce: int | None = None,
 ) -> dict:
+    """The document the merchant's wallet signs, for one visitor.
+
+    `visitor` is required because it is inside the signed struct: a payload is
+    good for one person, not for whoever reaches the contract first. That means
+    the merchant cannot pre-sign a QR and leave it on screen for the room — the
+    address has to be known before signing.
+    """
     nonce = new_nonce() if nonce is None else nonce
     expiry = int(time.time()) + signature_ttl_seconds
 
@@ -87,5 +101,6 @@ def build_payload(
             "nonce": nonce,
             "expiry": expiry,
             "geohash": geohash_to_bytes32(geohash),
+            "visitor": visitor,
         },
     }

@@ -9,9 +9,17 @@ from api.main import app
 
 client = TestClient(app)
 
+VISITOR = "0x7A3c9E1b4D2f5A8c6B0e9F7d3C1a5B8e2D4f6A90"
+
+
+def sign(campaign_id: int = 1, visitor: str = VISITOR):
+    return client.post(
+        "/qr/sign", json={"campaign_id": campaign_id, "visitor": visitor}
+    )
+
 
 def test_sign_returns_a_payload_for_a_real_campaign():
-    r = client.post("/qr/sign", json={"campaign_id": 1})
+    r = sign()
     assert r.status_code == 200
     body = r.json()
     assert body["typed_data"]["primaryType"] == "VisitSig"
@@ -20,40 +28,59 @@ def test_sign_returns_a_payload_for_a_real_campaign():
 
 def test_type_matches_the_contract_typehash():
     """Guards the one string that has to be identical in VisitRegistry.sol."""
-    fields = client.post("/qr/sign", json={"campaign_id": 1}).json()
-    types = fields["typed_data"]["types"]["VisitSig"]
+    types = sign().json()["typed_data"]["types"]["VisitSig"]
     encoded = ",".join(f"{f['type']} {f['name']}" for f in types)
-    assert encoded == "uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash"
+    assert encoded == (
+        "uint256 campaignId,uint256 nonce,uint64 expiry,bytes32 geohash,address visitor"
+    )
 
 
 def test_payload_carries_the_campaign_geohash_as_bytes32():
-    r = client.post("/qr/sign", json={"campaign_id": 1})
-    message = r.json()["typed_data"]["message"]
+    message = sign().json()["typed_data"]["message"]
     assert message["campaignId"] == 1
     # "dr5rsked" in ASCII, right-padded with zeros to 32 bytes.
     assert message["geohash"] == "0x" + b"dr5rsked".hex().ljust(64, "0")
 
 
-def test_the_visitor_is_not_in_the_signature():
-    """The merchant signs one QR for everyone, so it cannot name a visitor."""
-    r = client.post("/qr/sign", json={"campaign_id": 1})
-    assert "visitor" not in r.json()["typed_data"]["message"]
+def test_the_visitor_is_inside_the_signature():
+    """The property this endpoint exists to guarantee.
+
+    While `visitor` sat outside the signed struct, anyone holding the payload
+    could call claim() with an address of their own and take the reward — and
+    the payload is on a screen in a shop. Signing it binds the payment to one
+    person, which is also why a merchant can no longer pre-sign one QR for the
+    whole room.
+    """
+    message = sign().json()["typed_data"]["message"]
+    assert message["visitor"] == VISITOR
 
 
-def test_every_call_gets_a_fresh_nonce():
-    a = client.post("/qr/sign", json={"campaign_id": 1}).json()["nonce"]
-    b = client.post("/qr/sign", json={"campaign_id": 1}).json()["nonce"]
+def test_a_payload_is_good_for_one_visitor_only():
+    a = sign(visitor=VISITOR).json()["typed_data"]["message"]["visitor"]
+    b = sign(visitor="0x" + "1" * 40).json()["typed_data"]["message"]["visitor"]
     assert a != b
 
 
+def test_a_malformed_visitor_is_rejected():
+    assert sign(visitor="0x1").status_code == 422
+
+
+def test_the_visitor_is_required():
+    assert client.post("/qr/sign", json={"campaign_id": 1}).status_code == 422
+
+
+def test_every_call_gets_a_fresh_nonce():
+    assert sign().json()["nonce"] != sign().json()["nonce"]
+
+
 def test_signature_outlives_the_qr_on_screen():
-    r = client.post("/qr/sign", json={"campaign_id": 1}).json()
+    r = sign().json()
     assert r["expiry"] > time.time() + 60
     assert r["rotate_after_seconds"] < r["expiry"] - time.time()
 
 
 def test_unknown_campaign_returns_404():
-    assert client.post("/qr/sign", json={"campaign_id": 999}).status_code == 404
+    assert sign(campaign_id=999).status_code == 404
 
 
 ON_CHAIN = chain.OnChainCampaign(
@@ -80,14 +107,14 @@ def live(monkeypatch):
 
 def test_a_merchant_can_sign_against_a_real_campaign(live):
     """Used to be a 501: the payload was only buildable from the samples."""
-    assert client.post("/qr/sign", json={"campaign_id": 1}).status_code == 200
+    assert sign().status_code == 200
 
 
 def test_the_signed_geohash_is_the_one_the_contract_holds(live):
     """A payload built from a stale geohash is a signature that fails on chain."""
-    message = client.post("/qr/sign", json={"campaign_id": 1}).json()["typed_data"]["message"]
+    message = sign().json()["typed_data"]["message"]
     assert message["geohash"] == "0x" + b"dr5rsm47".hex().ljust(64, "0")
 
 
 def test_a_campaign_that_is_not_on_chain_is_404_when_live(live):
-    assert client.post("/qr/sign", json={"campaign_id": 999}).status_code == 404
+    assert sign(campaign_id=999).status_code == 404
