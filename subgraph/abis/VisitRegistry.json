@@ -1,0 +1,24 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "campaignId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "visitor", "type": "address" },
+      { "indexed": false, "internalType": "bytes32", "name": "nullifierHash", "type": "bytes32" },
+      { "indexed": false, "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+      { "indexed": false, "internalType": "bytes32", "name": "sigHash", "type": "bytes32" }
+    ],
+    "name": "VisitRecorded",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "uint256", "name": "campaignId", "type": "uint256" },
+      { "indexed": true, "internalType": "address", "name": "visitor", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "RewardPaid",
+    "type": "event"
+  }
+]

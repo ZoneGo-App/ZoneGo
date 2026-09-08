@@ -336,5 +336,13 @@ All four of us can explain any line of this project.
 
 ## License
 
-MIT
+MIT. The full text is in [`LICENSE`](LICENSE), and the three contracts carry it
+in their own headers, so the terms travel with the file:
 
+```solidity
+// SPDX-License-Identifier: MIT   ← VisitRegistry, CampaignVault, FraudOracle
+```
+
+MIT was the team's choice on day one. The file is what makes it true: a
+repository without one is not open source — it is *all rights reserved* by
+default, whatever the README says.

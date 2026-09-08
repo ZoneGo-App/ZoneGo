@@ -1,0 +1,31 @@
+# The build context is the repository root, so without this the virtualenv,
+# the git history and every cache get shipped to the Docker daemon on each
+# build. Locally that is slow; against a remote registry on deploy day it is
+# minutes per attempt.
+
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+.git/
+.github/
+.gitignore
+.gitmodules
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+contracts/
+subgraph/
+ml/
+feedback/
+schema/
+
+*.md
+.env
+.env.*
+docker-compose.yml
