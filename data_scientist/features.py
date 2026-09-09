@@ -97,3 +97,59 @@ def fit_aggregated_features(train_df: pd.DataFrame) -> dict:
         'covisits_train': covisits_train,
         'graph_reference': graph_reference,
     }
+
+def apply_aggregated_features(df: pd.DataFrame, fitted: dict) -> pd.DataFrame:
+    """Applies a previously-fitted bundle (from fit_aggregated_features) to
+    ANY dataframe: the test split during training, or a live wallet's
+    events during inference. Same function, same fitted numbers, every
+    time -- this is what makes the model servable at all.
+    """
+    df = df.merge(fitted['business_mode'], on='business_id', how='left')
+    df['modal_hour'] = df['modal_hour'].fillna(fitted['global_mode_hour'])
+    df['hour_deviation'] = np.abs(df['hour'] - df['modal_hour'])
+
+    df = df.merge(fitted['covisits_train'], on=['business_id', 'hour_window'], how='left')
+    df['covisit_degree'] = df['covisit_degree'].fillna(1)
+
+    df = apply_graph_features(df, fitted['graph_reference'])
+
+    # FIX (Observation #6): apply_graph_features() defaults an unseen
+    # wallet's business_entropy to 0 -- but entropy 0 is ALSO the score of
+    # the single most suspicious wallet (always visits the exact same
+    # business). A brand-new, legitimate visitor would enter the model
+    # wearing the fraud signature that feature exists to catch.
+    #
+    # "No history yet" is not evidence of fraud, so a never-seen wallet
+    # gets the dataset's MEDIAN entropy instead -- a neutral value, not the
+    # most-suspicious one. This is a stopgap, not the cleanest possible
+    # fix: a separate boolean "has_history" flag (as the review suggested)
+    # would let the model learn its own weighting for "unknown" instead of
+    # this hardcoded substitution -- worth doing if entropy's feature
+    # importance turns out to matter more later.
+    known_wallets = fitted['graph_reference']['business_entropy'].index
+    neutral_entropy = (
+        fitted['graph_reference']['business_entropy'].median()
+        if len(known_wallets) else 0.0
+    )
+    df.loc[~df['wallet'].isin(known_wallets), 'business_entropy'] = neutral_entropy
+
+    # Combine World's Sybil signal with the subgraph co-visit signal
+    # ("Combinarla con los rasgos de co-visita del subgraph"). Each alone
+    # can have an innocent explanation on its own -- a shared nullifier
+    # could just be a device/account-recovery edge case, and a co-visit
+    # cluster could be a family or a line at a popular register. A wallet
+    # that is BOTH sharing its nullifier with other wallets AND showing up
+    # in lockstep with them at the same business/hour is the actual
+    # wallet-farm shape (generate.py's Pattern 2 co_visit and Pattern 4
+    # repeated_nullifier are meant to be caught together, not separately).
+    #
+    # GradientBoostingClassifier already learns interactions between raw
+    # features on its own, so this explicit product isn't strictly
+    # necessary for the model -- it's added because it gives one
+    # human-readable "how much does this look like a farm" number for the
+    # README's top-features table and any future ops dashboard, without
+    # removing the two raw signals (still available separately to the
+    # model as sybil_score / covisit_partners).
+    df['wallet_farm_signal'] = df['sybil_score'] * (1 + df['covisit_partners'])
+
+    return df
