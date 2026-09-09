@@ -171,4 +171,78 @@ contract VisitRegistryTest is Test {
         vm.expectRevert(VisitRegistry.BadSig.selector);
         registry.claim(sig, badSignature, attestation, attestationSignature);
     }
+
+    function test_ReusedAttestationReverts() public {
+        VisitRegistry.VisitSig memory sig1 = VisitRegistry.VisitSig({
+            campaignId: campaignId,
+            nonce: 1,
+            expiry: uint64(block.timestamp + 1 hours),
+            geohash: bytes32(0),
+            visitor: visitor
+        });
+        bytes memory signature1 = _sign(sig1, merchantKey);
+
+        VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: keccak256("human-1"),
+            expiry: uint64(block.timestamp + 2 minutes)
+        });
+        bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
+        registry.claim(sig1, signature1, attestation, attestationSignature);
+
+        VisitRegistry.VisitSig memory sig2 = VisitRegistry.VisitSig({
+            campaignId: campaignId,
+            nonce: 2,
+            expiry: uint64(block.timestamp + 1 hours),
+            geohash: bytes32(0),
+            visitor: visitor
+        });
+        bytes memory signature2 = _sign(sig2, merchantKey);
+
+        vm.expectRevert(VisitRegistry.AttestationAlreadyUsed.selector);
+        registry.claim(sig2, signature2, attestation, attestationSignature);
+    }
+
+    function test_NullifierBoundToOtherVisitorReverts() public {
+        bytes32 nullifier = keccak256("human-1");
+
+        VisitRegistry.VisitSig memory sig1 = VisitRegistry.VisitSig({
+            campaignId: campaignId,
+            nonce: 1,
+            expiry: uint64(block.timestamp + 1 hours),
+            geohash: bytes32(0),
+            visitor: visitor
+        });
+        bytes memory signature1 = _sign(sig1, merchantKey);
+
+        VisitRegistry.WorldAttestation memory attestation1 = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: nullifier,
+            expiry: uint64(block.timestamp + 2 minutes)
+        });
+        bytes memory attestationSignature1 = _signAttestation(attestation1, attesterKey);
+
+        registry.claim(sig1, signature1, attestation1, attestationSignature1);
+
+        address otherVisitor = address(0x3);
+        VisitRegistry.VisitSig memory sig2 = VisitRegistry.VisitSig({
+            campaignId: campaignId,
+            nonce: 2,
+            expiry: uint64(block.timestamp + 1 hours),
+            geohash: bytes32(0),
+            visitor: otherVisitor
+        });
+        bytes memory signature2 = _sign(sig2, merchantKey);
+
+        VisitRegistry.WorldAttestation memory attestation2 = VisitRegistry.WorldAttestation({
+            visitor: otherVisitor,
+            nullifierHash: nullifier,
+            expiry: uint64(block.timestamp + 3 minutes)
+        });
+        bytes memory attestationSignature2 = _signAttestation(attestation2, attesterKey);
+
+        vm.expectRevert(VisitRegistry.NullifierBoundToOtherVisitor.selector);
+        registry.claim(sig2, signature2, attestation2, attestationSignature2);
+    }
 }
