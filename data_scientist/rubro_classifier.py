@@ -243,7 +243,10 @@ def train_rubro_classifier(random_state=42, test_size=0.25):
     # merchant text. This is exactly what a judge would test live.
     ood_results = evaluate_out_of_distribution(pipeline)
 
-    _OOD_EXAMPLES = [
+    write_report(acc, f1_mac, report, ood_results, n_train=len(X_train), n_test=len(X_test))
+    return pipeline, acc, f1_mac
+
+_OOD_EXAMPLES = [
     "We sell running sneakers and athletic wear",
     "zapatillas y ropa deportiva",
     "flowers and plants for your home",
