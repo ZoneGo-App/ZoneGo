@@ -245,4 +245,55 @@ contract VisitRegistryTest is Test {
         vm.expectRevert(VisitRegistry.NullifierBoundToOtherVisitor.selector);
         registry.claim(sig2, signature2, attestation2, attestationSignature2);
     }
+
+    function test_DailyCapExceededReverts() public {
+        usdc.transfer(merchant, 100e6);
+
+        vm.startPrank(merchant);
+        uint256 smallCapCampaign = vault.createCampaign(10e6, 2, bytes32(0), 1000);
+        usdc.approve(address(vault), 100e6);
+        vault.fund(smallCapCampaign, 100e6);
+        vm.stopPrank();
+
+        bytes32 nullifier = keccak256("human-daily-cap");
+
+        for (uint256 i = 0; i < 2; i++) {
+            VisitRegistry.VisitSig memory sig = VisitRegistry.VisitSig({
+                campaignId: smallCapCampaign,
+                nonce: 100 + i,
+                expiry: uint64(block.timestamp + 1 hours),
+                geohash: bytes32(0),
+                visitor: visitor
+            });
+            bytes memory signature = _sign(sig, merchantKey);
+
+            VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+                visitor: visitor,
+                nullifierHash: nullifier,
+                expiry: uint64(block.timestamp + 2 minutes + i)
+            });
+            bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
+            registry.claim(sig, signature, attestation, attestationSignature);
+        }
+
+        VisitRegistry.VisitSig memory sigThird = VisitRegistry.VisitSig({
+            campaignId: smallCapCampaign,
+            nonce: 103,
+            expiry: uint64(block.timestamp + 1 hours),
+            geohash: bytes32(0),
+            visitor: visitor
+        });
+        bytes memory signatureThird = _sign(sigThird, merchantKey);
+
+        VisitRegistry.WorldAttestation memory attestationThird = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: nullifier,
+            expiry: uint64(block.timestamp + 5 minutes)
+        });
+        bytes memory attestationSignatureThird = _signAttestation(attestationThird, attesterKey);
+
+        vm.expectRevert(VisitRegistry.DailyCapExceeded.selector);
+        registry.claim(sigThird, signatureThird, attestationThird, attestationSignatureThird);
+    }
 }

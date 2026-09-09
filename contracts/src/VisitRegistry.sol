@@ -42,7 +42,7 @@ contract VisitRegistry is EIP712 {
 
     mapping(address => mapping(uint256 => bool)) public usedNonce;
     mapping(bytes32 => uint8) public visitsThisWeek;
-    mapping(bytes32 => uint256) public dailySpent;
+    mapping(bytes32 => uint256) public visitsToday;
     mapping(bytes32 => address) public nullifierBoundTo;
     mapping(bytes32 => bool) public usedAttestation;
 
@@ -105,6 +105,11 @@ contract VisitRegistry is EIP712 {
             revert NullifierBoundToOtherVisitor();
         }
 
+        bytes32 dayKey = keccak256(abi.encode(sig.campaignId, block.timestamp / 1 days));
+        uint256 countToday = visitsToday[dayKey] + 1;
+        if (countToday > dailyCap) revert DailyCapExceeded();
+        visitsToday[dayKey] = countToday;
+
         usedNonce[merchant][sig.nonce] = true;
 
         bytes32 weekKey = keccak256(abi.encode(sig.campaignId, nullifierHash, block.timestamp / 1 weeks));
@@ -115,11 +120,6 @@ contract VisitRegistry is EIP712 {
         uint256 amount = (rewardPerVisit * percent) / 100;
 
         if (amount > 0) {
-            bytes32 dayKey = keccak256(abi.encode(sig.campaignId, block.timestamp / 1 days));
-            uint256 spentToday = dailySpent[dayKey] + amount;
-            if (spentToday > dailyCap) revert DailyCapExceeded();
-            dailySpent[dayKey] = spentToday;
-
             VAULT.payReward(sig.campaignId, sig.visitor, amount);
             emit RewardPaid(sig.campaignId, sig.visitor, amount);
         }
