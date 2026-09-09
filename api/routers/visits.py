@@ -80,6 +80,39 @@ def claim(req: ClaimRequest):
                 "attestation is required: call POST /world/verify first",
                 req,
             )
+        if attestation.expiry <= int(time.time()):
+            # Its own clock, separate from the QR's. Two minutes from the World
+            # session that produced it, so a stale one means verify again
+            # rather than scan again.
+            _refuse(
+                410,
+                "attestation_expired",
+                "World attestation expired, verify again",
+                req,
+            )
+        if attestation.visitor.lower() != req.visitor.lower():
+            # The contract refuses this too. Catching it here saves the gas of
+            # finding out on chain.
+            _refuse(
+                400,
+                "attestation_visitor_mismatch",
+                "Attestation names a different visitor",
+                req,
+            )
+        if (
+            req.nullifier_hash
+            and req.nullifier_hash.lower() != attestation.nullifier_hash.lower()
+        ):
+            # Two answers to one question. The contract reads the nullifier out
+            # of the attestation and ignores the loose field, so a caller
+            # sending both is confused about which one counts — say so instead
+            # of quietly preferring either.
+            _refuse(
+                400,
+                "nullifier_disagrees_with_attestation",
+                "nullifier_hash does not match the attestation",
+                req,
+            )
 
         try:
             tx_hash = relay.send_claim(

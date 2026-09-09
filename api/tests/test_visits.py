@@ -138,6 +138,38 @@ def test_a_claim_without_an_attestation_is_refused(live):
     assert client.post("/visits/claim", json=a_claim()).status_code == 400
 
 
+def test_an_expired_attestation_is_refused_before_it_costs_gas(live):
+    """Its own clock: the QR may be fresh and the World session long over."""
+    stale = an_attestation(expiry=int(time.time()) - 1)
+    r = client.post("/visits/claim", json=a_claim(attestation=stale))
+    assert r.status_code == 410
+
+
+def test_an_attestation_for_somebody_else_is_refused(live):
+    """The contract reverts on this. Finding out here is free."""
+    someone_else = an_attestation(visitor="0x" + "e5" * 20)
+    r = client.post("/visits/claim", json=a_claim(attestation=someone_else))
+    assert r.status_code == 400
+
+
+def test_a_loose_nullifier_contradicting_the_attestation_is_refused(live):
+    """Two answers to one question, so refuse rather than pick one quietly."""
+    r = client.post(
+        "/visits/claim",
+        json=a_claim(attestation=an_attestation(), nullifier_hash="0x" + "f6" * 32),
+    )
+    assert r.status_code == 400
+
+
+def test_a_loose_nullifier_that_agrees_is_accepted(live):
+    """Redundant is not wrong: a caller sending both is only repeating itself."""
+    r = client.post(
+        "/visits/claim",
+        json=a_claim(attestation=an_attestation(), nullifier_hash=NULLIFIER),
+    )
+    assert r.status_code == 200
+
+
 def test_a_relay_failure_is_502_not_500(live, monkeypatch):
     def boom(claim):
         raise relay.RelayError("node unreachable")
