@@ -14,6 +14,7 @@ from api.routers import (
     score,
     search,
     visits,
+    world,
 )
 
 
@@ -53,3 +54,4 @@ app.include_router(visits.router)
 app.include_router(score.router)
 app.include_router(leaderboard.router)
 app.include_router(epochs.router)
+app.include_router(world.router)

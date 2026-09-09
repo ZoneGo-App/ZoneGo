@@ -169,6 +169,35 @@ class ClaimResponse(BaseModel):
     relayed: bool = True
 
 
+class WorldVerifyRequest(BaseModel):
+    """What the phone got back from IDKit, plus who is claiming to be it."""
+
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
+    """
+    The IDKit response, forwarded to World untouched. Not modelled field by
+    field on purpose: World versions this payload — 3.0 legacy, 4.0 uniqueness,
+    4.0 session — and a schema of ours would reject a shape they added next
+    week. We relay the question; they decide whether it is well formed.
+    """
+    proof: dict
+
+
+class WorldAttestation(BaseModel):
+    """Our signature that World confirmed this wallet is a verified human.
+
+    Carried into `POST /visits/claim`, where the contract recovers the signer
+    and checks it against the attester address it trusts.
+    """
+
+    visitor: str
+    nullifier_hash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    "Unix seconds. Short — this is meant to be used in the same session."
+    expiry: int
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+    "The full EIP-712 document, so a caller can verify what was signed."
+    typed_data: dict
+
+
 class EpochWindow(BaseModel):
     """Which batch of scores is open, and how long until it closes.
 
