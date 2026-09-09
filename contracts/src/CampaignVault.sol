@@ -8,6 +8,7 @@ contract CampaignVault {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable USDC;
+    address public immutable DEPLOYER;
     address public visitRegistry;
 
     struct Campaign {
@@ -28,9 +29,11 @@ contract CampaignVault {
 
     constructor(address _usdc) {
         USDC = IERC20(_usdc);
+        DEPLOYER = msg.sender;
     }
 
     function setVisitRegistry(address _visitRegistry) external {
+        require(msg.sender == DEPLOYER, "not deployer");
         require(_visitRegistry != address(0), "zero address");
         require(visitRegistry == address(0), "already set");
         visitRegistry = _visitRegistry;
@@ -40,6 +43,10 @@ contract CampaignVault {
         external
         returns (uint256 campaignId)
     {
+        require(rewardPerVisit > 0, "zero reward");
+        require(dailyCap > 0, "zero daily cap");
+        require(radius > 0, "zero radius");
+
         campaignId = nextCampaignId++;
         campaigns[campaignId] = Campaign({
             merchant: msg.sender,

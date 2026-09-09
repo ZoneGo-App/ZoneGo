@@ -65,4 +65,28 @@ contract CampaignVaultTest is Test {
         assertEq(balanceAfterWithdraw, 0);
         assertEq(usdc.balanceOf(merchant), merchantBalanceBefore + 100e6);
     }
+
+    function test_SetVisitRegistryNotDeployerReverts() public {
+        vm.prank(stranger);
+        vm.expectRevert("not deployer");
+        vault.setVisitRegistry(address(0x99));
+    }
+
+    function test_CreateCampaignZeroRewardReverts() public {
+        vm.prank(merchant);
+        vm.expectRevert("zero reward");
+        vault.createCampaign(0, 10e6, bytes32(0), 1000);
+    }
+
+    function test_CreateCampaignZeroDailyCapReverts() public {
+        vm.prank(merchant);
+        vm.expectRevert("zero daily cap");
+        vault.createCampaign(1e6, 0, bytes32(0), 1000);
+    }
+
+    function test_CreateCampaignZeroRadiusReverts() public {
+        vm.prank(merchant);
+        vm.expectRevert("zero radius");
+        vault.createCampaign(1e6, 10e6, bytes32(0), 0);
+    }
 }
