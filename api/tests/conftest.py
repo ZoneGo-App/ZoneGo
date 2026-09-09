@@ -13,7 +13,7 @@ after this and wins.
 
 import pytest
 
-from api import chain, epochs, world
+from api import chain, epochs, observability, ratelimit, world
 from api.config import get_config
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -37,7 +37,12 @@ def pinned_settings(monkeypatch):
     epochs.clear_cache()
     # A nullifier bound in one test would refuse a different wallet in the next.
     world.clear_bindings()
+    # Every test calls from the same client, so without this the twentieth one
+    # to touch a route gets a 429 for something the nineteenth did.
+    ratelimit.reset()
+    observability.reset_counters()
     yield
     chain.clear_cache()
     epochs.clear_cache()
     world.clear_bindings()
+    ratelimit.reset()
