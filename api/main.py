@@ -1,9 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from api import observability, ratelimit
 from api.config import cors_origin_list, get_config
 from api.routers import (
     campaigns,
@@ -22,6 +24,7 @@ from api.routers import (
 async def lifespan(_: FastAPI):
     """Say it out loud on boot. A deployment left in mock mode answers 200 to
     everything and looks perfectly healthy while serving invented data."""
+    observability.configure_logging()
     config = get_config()
     log = logging.getLogger("uvicorn.error")
     if config.mock_mode:
@@ -37,6 +40,35 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+@app.middleware("http")
+async def throttle_and_count(request: Request, call_next):
+    """One caller's budget per route, and a tally of what came back.
+
+    Ahead of the routes on purpose: a claim that is going to be refused should
+    cost nothing, and the point of limiting that path is that reaching the relay
+    at all spends gas.
+    """
+    # Health and metrics are what an uptime check and a person debugging use,
+    # and throttling those means going blind exactly when it matters.
+    if request.url.path not in ("/health", "/ready", "/metrics"):
+        client = request.client.host if request.client else "unknown"
+        wait = ratelimit.check(client, request.url.path)
+        if wait is not None:
+            observability.rejected(
+                "rate_limited", path=request.url.path, client=client, retry_after=wait
+            )
+            observability.record_response(429)
+            return JSONResponse(
+                {"detail": f"Too many requests. Try again in {wait}s."},
+                status_code=429,
+                headers={"Retry-After": str(int(wait) + 1)},
+            )
+
+    response = await call_next(request)
+    observability.record_response(response.status_code)
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
