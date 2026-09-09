@@ -22,9 +22,13 @@ EVENT_SCHEMA = [
     "timestamp",      # datetime  - block timestamp of VisitRecorded
 ]
 
-# Only present on labeled/synthetic data. Real on-chain events won't carry
-# this until fraud is confirmed some other way (see ml/DATA.md, section 3).
+
 LABEL_COLUMN = "is_fraud"
+# Real mapping:
+#   business_id   -> merchant.id (denormalized directly onto Visit)
+#   lat / lon     -> decoded from campaign.geohash (see _decode_geohash below)
+#   business_type -> does not exist on-chain yet. Stays "unknown" until the
+#                    team decides where merchant category/description lives.
 
 _VISITS_QUERY= """
 query GetVisits($first: Int!, $skip: Int!) {
@@ -39,8 +43,49 @@ query GetVisits($first: Int!, $skip: Int!) {
 }
 """
 
+_GEOHASH_BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz"
 
+def _decode_geohash(geohash: str) -> tuple:
+     """Standard base32 geohash -> (lat, lon) decoding. Public, well-known
+        algorithm, implemented here from scratch (no external geohash
+        dependency needed for this one conversion).
+    """
+     lat_range = [-90.0, 90.0]
+     lon_range = [-180.0, 180.0]
+     event_bit = True
+     for char in geohash:
+        idx = _GEOHASH_BASE32.index(char)
+        for bit_pos in range(4, -1, -1):
+            bit = (idx >> bit_pos) & 1
+            target = lon_range if event_bit else lat_range
+            mid = (target[0] + target[1]) / 2
+            if bit:
+                target[0] = mid
+            else:
+                target[1] = mid
+                even_bit = not even_bit
+        lat = (lat_range[0] + lat_range[1]) / 2
+        lon = (lon_range[0] + lon_range[1]) / 2
+        return lat, lon
 
+def _bytes32_to_geohash_string(hex_value: str) -> str:
+   
+    hex_value = hex_value[2:] if hex_value.startswith("0x") else hex_value
+    raw = bytes.fromhex(hex_value)
+    return raw.rstrip(b"\x00").decode("ascii", errors="ignore")
+
+def _resolve_lat_lon(geohash_value) -> tuple:
+    
+    if not geohash_value or not isinstance(geohash_value, str):
+        raise ValueError(f"empty or non-string geohash: {geohash_value!r}")
+    try:
+        if geohash_value.startswith("0x"):
+            geohash_value = _bytes32_to_geohash_string(geohash_value)
+        if not geohash_value:
+            raise ValueError("geohash decoded to an empty string")
+        return _decode_geohash(geohash_value)
+    except (ValueError, IndexError) as exc:
+        raise ValueError(f"could not decode geohash {geohash_value!r}: {exc}") from exc
 
 def _validate_schema(df: pd.DataFrame, require_label: bool = False) -> None:
     required = list(EVENT_SCHEMA) + ([LABEL_COLUMN] if require_label else [])
@@ -62,48 +107,51 @@ def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_page
     """Adapter stub: subgraph (GraphQL) -> canonical event schema."""
 
     rows=[]
+    skipped = 0
     for page in range(max_pages):
-        skip =page*page_size
-        resp = requests.post(
+        skip =page * page_size
+        try:
+            resp = requests.post(
             subgraph_url,
             json={"query": _VISITS_QUERY, "variables": {"first":page_size, "skip":skip}},
             timeout=30
         )
-        resp.raise_for_status()
+            resp.raise_for_status()
+        except requests.exceptions.RequestException as Exc:
+            raise RuntimeError(f'Subgraph request failed (page {page}, skip {skip}')
+        
         payload = resp.json()
         if "errors" in payload:
             raise RuntimeError(f"Subgraph returned errors: {payload['errors']}")
-        visits = payload.get("data", {}).get("visits", [])
+        
+        visits = payload["data"]["visits"]
         if not visits:
             break
+
         for v in visits:
-            merchant = v.get("merchant") or {}
-            campaign = v.get("campaign") or {}
-            
-            # Decodificación del geohash de la campaña para obtener lat/lon
-            lat, lon = 0.0, 0.0
-            raw_geohash = campaign.get("geohash")
-            if raw_geohash:
-                try:
-                    from utils import decode_geohash
-                    lat, lon = decode_geohash(raw_geohash)
-                except ImportError:
-                    pass  # Si la función está en otro módulo, ajústala aquí
-
-            rows.append({
-                "visit_id": v.get("id"),
-                "wallet": v.get("visitor", {}).get("id"),
-                "nullifier": v.get("nullifierHash"),
-                "business_id": merchant.get("id", "unknown"),
-                "business_type": "unknown",  # No viene en cadena por ahora
-                "lat": float(lat),
-                "lon": float(lon),
-                "timestamp": pd.to_datetime(int(v.get("timestamp", 0)), unit="s"),
-            })
-
-        if len(visits) < page_size:
-            break  # Última página
-
-    df = pd.DataFrame(rows, columns=EVENT_SCHEMA)
-    _validate_schema(df, require_label=False)
-    return df
+            try:
+                lat, lon = _resolve_lat_lon(v["campaign"]["geohash"])
+                rows.append({
+                    "visit_id": v["id"],
+                    "wallet": v["visitor"]["id"],
+                    "nullifier": v["nullifierHash"],
+                    "business_id": v["merchant"]["id"],  # denormalized directly on Visit
+                    "business_type": "unknown",           # not on-chain yet — see Observation #9
+                    "lat": lat,
+                    "lon": lon,
+                        "timestamp": pd.to_datetime(int(v["timestamp"]), unit="s"),
+                    })
+            except (KeyError, TypeError, ValueError) as exc:
+                skipped += 1
+                visit_id = v.get("id", "<unknown>") if isinstance(v, dict) else "<unknown>"
+                print(f"WARNING: skipping visit {visit_id} — {exc}")
+        
+            if len(visits) < page_size:
+                    break  # last page
+        
+        if skipped:
+            print(f"load_events_from_subgraph: skipped {skipped} malformed visit(s) out of {skipped + len(rows)} fetched")
+        
+        df = pd.DataFrame(rows, columns=EVENT_SCHEMA)
+        _validate_schema(df, require_label=False)
+        return df
