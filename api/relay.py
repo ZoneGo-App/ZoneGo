@@ -11,9 +11,10 @@ visitor could send the identical call from their own wallet and be paid the
 same amount, which is why `relayed` is a field in the response and not a
 requirement of the protocol.
 
-One thing it does decide, and this is not settled: `visitor` sits outside the
-signed struct, so whoever sends the transaction names who gets paid. Until
-World's proof binds the nullifier to an address, that choice is ours.
+The visitor used to sit outside the signed struct, which meant whoever sent the
+transaction named who got paid — a real hole, and the contract closed it. Now
+two signatures travel through here and neither is ours to alter: the merchant's
+over the visit, and the attester's over what World answered.
 """
 
 from dataclasses import dataclass
@@ -47,7 +48,19 @@ VISIT_REGISTRY_ABI = [
                 ],
             },
             {"name": "signature", "type": "bytes"},
-            {"name": "nullifierHash", "type": "bytes32"},
+            # World's answer, signed by the attester. The contract reads the
+            # nullifier out of this struct rather than from a loose argument,
+            # so there is exactly one place it can come from.
+            {
+                "name": "attestation",
+                "type": "tuple",
+                "components": [
+                    {"name": "visitor", "type": "address"},
+                    {"name": "nullifierHash", "type": "bytes32"},
+                    {"name": "expiry", "type": "uint64"},
+                ],
+            },
+            {"name": "attestationSignature", "type": "bytes"},
         ],
     }
 ]
@@ -59,7 +72,12 @@ class RelayError(RuntimeError):
 
 @dataclass(frozen=True)
 class Claim:
-    """The four signed fields, plus who is claiming and which human they are."""
+    """The merchant's signed visit, and the attestation naming the human.
+
+    Two independent expiries, because they answer to different clocks: the
+    merchant's signature dies with the QR, the attestation dies with the World
+    session that produced it.
+    """
 
     campaign_id: int
     # The merchant's single-use nonce from the QR. Not the account nonce below.
@@ -68,7 +86,11 @@ class Claim:
     geohash: str
     signature: str
     visitor: str
+    # All three from POST /world/verify, and they travel together or not at
+    # all: the signature only recovers over this exact nullifier and expiry.
     nullifier_hash: str
+    attestation_expiry: int
+    attestation_signature: str
 
 
 def _bytes(value: str) -> bytes:
@@ -106,16 +128,22 @@ def send_claim(claim: Claim) -> str:
     # The visitor travels inside the signed struct now, not beside it. The
     # relay cannot swap it for an address of its own without the merchant's
     # signature failing to recover — which is the point.
+    visitor = Web3.to_checksum_address(claim.visitor)
+
     call = registry.functions.claim(
         (
             claim.campaign_id,
             claim.nonce,
             claim.expiry,
             _bytes(claim.geohash),
-            Web3.to_checksum_address(claim.visitor),
+            visitor,
         ),
         _bytes(claim.signature),
-        _bytes(claim.nullifier_hash),
+        # The same `visitor` fills both structs on purpose. The contract
+        # requires them equal, so passing one value twice removes the only way
+        # this call could contradict itself.
+        (visitor, _bytes(claim.nullifier_hash), claim.attestation_expiry),
+        _bytes(claim.attestation_signature),
     )
 
     try:

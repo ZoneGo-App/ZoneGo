@@ -69,11 +69,17 @@ def claim(req: ClaimRequest):
 
     config = get_config()
     if not config.mock_mode:
-        if not req.nullifier_hash:
-            # Zero would put every visitor in one weekly bucket, so the second
-            # person to claim anywhere would be paid 50% of a reward that was
-            # their first. Refusing beats paying the wrong amount.
-            _refuse(400, "missing_nullifier", "nullifier_hash is required", req)
+        attestation = req.attestation
+        if attestation is None:
+            # Without it there is no nullifier, and a zero would put every
+            # visitor in one weekly bucket — the second person to claim
+            # anywhere would be paid 50% of a reward that was their first.
+            _refuse(
+                400,
+                "missing_attestation",
+                "attestation is required: call POST /world/verify first",
+                req,
+            )
 
         try:
             tx_hash = relay.send_claim(
@@ -84,7 +90,9 @@ def claim(req: ClaimRequest):
                     geohash=req.geohash,
                     signature=req.signature,
                     visitor=req.visitor,
-                    nullifier_hash=req.nullifier_hash,
+                    nullifier_hash=attestation.nullifier_hash,
+                    attestation_expiry=attestation.expiry,
+                    attestation_signature=attestation.signature,
                 )
             )
         except relay.RelayError as exc:
