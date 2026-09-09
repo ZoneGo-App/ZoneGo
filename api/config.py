@@ -85,6 +85,20 @@ class Config(BaseSettings):
     # enough that one intercepted off a screen is already dead.
     attestation_ttl_seconds: int = 120
 
+    # --- Epoch publication -------------------------------------------------
+    #
+    # A third key, and again not a spare copy of the others. Leaking the relay
+    # costs gas; leaking the attester lets somebody mint verified humans;
+    # leaking this one lets somebody rewrite who the model called fraudulent.
+    # Three consequences, three keys.
+    #
+    # It sends one transaction an hour, so it needs a fraction of the relay's
+    # balance. Empty until Sebastián redeploys with the address of the oracle —
+    # the job runs the whole path either way and says which of the two is
+    # missing rather than failing silently every hour.
+    fraud_oracle_address: str = "0x0000000000000000000000000000000000000000"
+    fraud_operator_private_key: str = ""
+
 
 @lru_cache
 def get_config() -> Config:
