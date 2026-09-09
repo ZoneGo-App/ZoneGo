@@ -31,6 +31,11 @@ services:
         value: "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
       - key: WORLD_ACTION
         value: verify-visitor
+      # Left for the dashboard, unlike the two above: the oracle does not exist
+      # yet. It arrives with Sebastián's redeploy, and so do new values for the
+      # vault and the registry — all three change together.
+      - key: FRAUD_ORACLE_ADDRESS
+        sync: false
       # `sync: false` means Render asks for the value in the dashboard instead of
       # reading it from here. Anything secret goes in this list and nowhere else
       # — this file is committed.
@@ -43,6 +48,11 @@ services:
       - key: ATTESTER_PRIVATE_KEY
         sync: false
       - key: RELAY_PRIVATE_KEY
+        sync: false
+      # Signs commitEpoch and nothing else. Separate from the two above because
+      # the damage differs: the relay costs gas, the attester mints verified
+      # humans, and this one rewrites who the model called fraudulent.
+      - key: FRAUD_OPERATOR_PRIVATE_KEY
         sync: false
       # The deployed frontend lives on another domain, so without this the
       # browser blocks every request David makes.

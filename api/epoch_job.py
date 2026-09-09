@@ -9,8 +9,8 @@ It lives inside the API process rather than as its own service, and that is a
 deliberate trade. A second container is a second thing to deploy, a second thing
 to keep funded, and a second thing to notice has died — for a job that runs once
 an hour and finishes in seconds. The cost is that two replicas would both try to
-publish; the guard for that is on chain, where `commitEpoch` should reject an
-epoch that already has a root.
+publish; the guard for that is on chain, where `commitEpoch` refuses an epoch
+that is not greater than the one already committed.
 
 It never raises. A background task that kills the process on a bad hour would
 take the whole API down over a subgraph hiccup, and the API is the part a judge
@@ -20,7 +20,7 @@ opens.
 import asyncio
 import time
 
-from api import epochs, observability
+from api import epochs, observability, oracle
 from api.config import get_config
 
 # Checked more often than an epoch is long, so the root lands soon after the
@@ -35,25 +35,52 @@ def reset() -> None:
     _last_published = None
 
 
-def _publish(commitment: epochs.Commitment) -> None:
-    """Put the root on chain.
-
-    Not wired yet: `FraudOracle.commitEpoch` is still `revert("not
-    implemented")`. Until it lands, the job proves the rest of the path — the
-    window closes, the subgraph is read, the tree is built — and records the
-    root it would have published, so the day the contract is ready this is one
-    call rather than a new feature.
-    """
+def _settled(fields: dict, reason: str) -> bool:
+    """Nothing left to do for this epoch, and it is not a failure."""
     observability.log.info(
-        "epoch_ready",
-        extra={
-            "epoch": commitment.epoch,
-            "root": commitment.root,
-            "wallets": commitment.wallets,
-            "published": False,
-            "reason": "commitEpoch not implemented yet",
-        },
+        "epoch_ready", extra={**fields, "published": False, "reason": reason}
     )
+    return True
+
+
+def _publish(commitment: epochs.Commitment) -> bool:
+    """Put the root on chain. True when the epoch needs no further attempt.
+
+    False is reserved for a node that refused or could not be reached — the
+    caller leaves the epoch unmarked so the next tick tries again, because an
+    hour's root should not be lost to one bad minute. Every other outcome,
+    including having nothing to publish to, is settled and says so in the log.
+    """
+    fields = {
+        "epoch": commitment.epoch,
+        "root": commitment.root,
+        "wallets": commitment.wallets,
+    }
+
+    if get_config().mock_mode:
+        return _settled(fields, "mock mode, no chain to publish to")
+    if not oracle.configured():
+        return _settled(fields, "FraudOracle address or operator key not set")
+
+    try:
+        on_chain = oracle.published_epoch()
+        if on_chain is not None and commitment.epoch <= on_chain:
+            # The job's memory dies with the process, so after a redeploy it
+            # reaches an hour the chain already answered. Two replicas would
+            # race here too. Neither is a failure.
+            return _settled(fields, f"already on chain, at epoch {on_chain}")
+
+        tx_hash = oracle.commit_epoch(root=commitment.root, epoch=commitment.epoch)
+    except oracle.OracleError as exc:
+        observability.log.warning(
+            "epoch_publish_failed", extra={**fields, "error": str(exc)}
+        )
+        return False
+
+    observability.log.info(
+        "epoch_ready", extra={**fields, "published": True, "tx_hash": tx_hash}
+    )
+    return True
 
 
 def run_once() -> bool:
@@ -74,15 +101,18 @@ def run_once() -> bool:
         )
         return False
 
-    _last_published = epoch
-
     if commitment is None:
         # A quiet hour. Committing a root over nobody would be a transaction
         # that says nothing, so there is nothing to publish and that is fine.
+        _last_published = epoch
         observability.log.info("epoch_empty", extra={"epoch": epoch})
         return False
 
-    _publish(commitment)
+    if not _publish(commitment):
+        # Left unmarked on purpose, so the next tick retries this same hour.
+        return False
+
+    _last_published = epoch
     return True
 
 

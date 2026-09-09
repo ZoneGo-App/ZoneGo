@@ -49,9 +49,13 @@ def ready():
         "node": _node(config),
         "relay_key": "configured" if config.relay_private_key else "missing",
         "attester_key": "configured" if config.attester_private_key else "missing",
+        "operator_key": (
+            "configured" if config.fraud_operator_private_key else "missing"
+        ),
         "world_rp": "configured" if config.world_rp_id else "missing",
         "vault_address": "set" if config.campaign_vault_address != ZERO else "unset",
         "registry_address": "set" if config.visit_registry_address != ZERO else "unset",
+        "oracle_address": "set" if config.fraud_oracle_address != ZERO else "unset",
     }
 
     # A missing key is not an outage — the API still reads and still signs QR
