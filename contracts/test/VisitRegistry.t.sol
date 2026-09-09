@@ -18,15 +18,18 @@ contract VisitRegistryTest is Test {
     MockUSDC usdc;
 
     uint256 merchantKey = 0xA11CE;
+    uint256 attesterKey = 0xB0B;
     address merchant;
+    address attester;
     address visitor = address(0x2);
     uint256 campaignId;
 
     function setUp() public {
         merchant = vm.addr(merchantKey);
+        attester = vm.addr(attesterKey);
         usdc = new MockUSDC();
         vault = new CampaignVault(address(usdc));
-        registry = new VisitRegistry(address(vault));
+        registry = new VisitRegistry(address(vault), attester);
         vault.setVisitRegistry(address(registry));
 
         vm.prank(merchant);
@@ -62,6 +65,19 @@ contract VisitRegistryTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
+    function _signAttestation(VisitRegistry.WorldAttestation memory att, uint256 signerKey)
+        internal
+        view
+        returns (bytes memory)
+    {
+        bytes32 structHash = keccak256(
+            abi.encode(registry.ATTESTATION_TYPEHASH(), att.visitor, att.nullifierHash, att.expiry)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", _domainSeparator(), structHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
     function test_ReusedNonceReverts() public {
         VisitRegistry.VisitSig memory sig = VisitRegistry.VisitSig({
             campaignId: campaignId,
@@ -71,10 +87,18 @@ contract VisitRegistryTest is Test {
             visitor: visitor
         });
         bytes memory signature = _sign(sig, merchantKey);
-        registry.claim(sig, signature, keccak256("human-1"));
+
+        VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: keccak256("human-1"),
+            expiry: uint64(block.timestamp + 2 minutes)
+        });
+        bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
+        registry.claim(sig, signature, attestation, attestationSignature);
 
         vm.expectRevert(VisitRegistry.NonceAlreadyUsed.selector);
-        registry.claim(sig, signature, keccak256("human-1"));
+        registry.claim(sig, signature, attestation, attestationSignature);
     }
 
     function test_DecreasingCurvePaysCorrectAmounts() public {
@@ -91,8 +115,15 @@ contract VisitRegistryTest is Test {
             });
             bytes memory signature = _sign(sig, merchantKey);
 
+            VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+                visitor: visitor,
+                nullifierHash: nullifier,
+                expiry: uint64(block.timestamp + 2 minutes + i)
+            });
+            bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
             uint256 balanceBefore = usdc.balanceOf(visitor);
-            registry.claim(sig, signature, nullifier);
+            registry.claim(sig, signature, attestation, attestationSignature);
             uint256 paid = usdc.balanceOf(visitor) - balanceBefore;
             assertEq(paid, expectedAmounts[i], "wrong amount for visit");
         }
@@ -108,8 +139,15 @@ contract VisitRegistryTest is Test {
         });
         bytes memory signature = _sign(sig, merchantKey);
 
+        VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: keccak256("human-1"),
+            expiry: uint64(block.timestamp + 2 minutes)
+        });
+        bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
         vm.expectRevert(VisitRegistry.SignatureExpired.selector);
-        registry.claim(sig, signature, keccak256("human-1"));
+        registry.claim(sig, signature, attestation, attestationSignature);
     }
 
     function test_WrongSignerReverts() public {
@@ -123,7 +161,14 @@ contract VisitRegistryTest is Test {
         uint256 wrongKey = 0xBAD;
         bytes memory badSignature = _sign(sig, wrongKey);
 
+        VisitRegistry.WorldAttestation memory attestation = VisitRegistry.WorldAttestation({
+            visitor: visitor,
+            nullifierHash: keccak256("human-1"),
+            expiry: uint64(block.timestamp + 2 minutes)
+        });
+        bytes memory attestationSignature = _signAttestation(attestation, attesterKey);
+
         vm.expectRevert(VisitRegistry.BadSig.selector);
-        registry.claim(sig, badSignature, keccak256("human-1"));
+        registry.claim(sig, badSignature, attestation, attestationSignature);
     }
 }
