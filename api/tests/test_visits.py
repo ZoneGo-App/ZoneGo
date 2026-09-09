@@ -62,6 +62,18 @@ def test_a_geohash_from_another_store_is_refused():
     assert r.status_code == 409
 
 
+def test_a_nonce_sent_as_a_string_is_accepted():
+    """/qr/sign hands it over as a string, so a claim can send it back as one.
+
+    A frontend should never have to convert a value we gave it — and if it
+    tried, converting it through a JavaScript number is exactly the rounding
+    the string was there to avoid.
+    """
+    big = "12637475492468184470"
+    r = client.post("/visits/claim", json=a_claim(nonce=big))
+    assert r.status_code == 200
+
+
 def test_the_same_claim_is_idempotent_in_mock_mode():
     a = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
     b = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]

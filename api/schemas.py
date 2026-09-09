@@ -166,6 +166,9 @@ class ClaimRequest(BaseModel):
     """
 
     campaign_id: int = Field(..., ge=0)
+    # Comes back as a string from /qr/sign, and a string is what a JavaScript
+    # caller can send without rounding it. Accepted either way — the frontend
+    # should never have to convert a value it was handed.
     nonce: int = Field(..., ge=0)
     expiry: int = Field(..., gt=0)
     geohash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
@@ -256,6 +259,9 @@ class QrSignResponse(BaseModel):
     # The full EIP-712 document the merchant wallet signs. Handed over as-is so
     # the frontend passes it straight to the wallet without rebuilding it.
     typed_data: dict
-    nonce: int
+    # A decimal string, not a number: a 64-bit nonce is past what a JavaScript
+    # number holds exactly, and `JSON.parse` rounds it without saying so. The
+    # wallet would then sign a nonce that was never issued.
+    nonce: str
     expiry: int
     rotate_after_seconds: int

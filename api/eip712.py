@@ -59,6 +59,21 @@ def new_nonce() -> int:
     return secrets.randbits(64)
 
 
+def _js_safe(value: int) -> str:
+    """A uint256 as a decimal string, because JSON numbers are not integers.
+
+    A 64-bit nonce is past 2**53 almost every time, and that is where a
+    JavaScript number stops being exact. `JSON.parse` would round it silently —
+    no error, no warning — and the wallet would sign a nonce the contract never
+    issued. Every claim would revert and nothing in the frontend would say why.
+
+    A string survives the trip whole, and viem and ethers both take one wherever
+    a uint256 is expected. Solidity never sees this: the wallet turns it back
+    into a number before hashing.
+    """
+    return str(value)
+
+
 def build_payload(
     *,
     campaign_id: int,
@@ -98,7 +113,10 @@ def build_payload(
         },
         "message": {
             "campaignId": campaign_id,
-            "nonce": nonce,
+            # A string on purpose — see `_js_safe`. The other two numbers here
+            # are small enough to survive JSON: a campaign id counts stores, and
+            # an expiry is seconds since 1970.
+            "nonce": _js_safe(nonce),
             "expiry": expiry,
             "geohash": geohash_to_bytes32(geohash),
             "visitor": visitor,

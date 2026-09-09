@@ -73,6 +73,30 @@ def test_every_call_gets_a_fresh_nonce():
     assert sign().json()["nonce"] != sign().json()["nonce"]
 
 
+JS_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def test_the_nonce_travels_as_a_string():
+    """Past 2**53 a JavaScript number stops being exact, and `JSON.parse`
+    rounds without saying so. The wallet would sign a nonce that was never
+    issued, every claim would revert, and nothing would name the cause."""
+    body = sign().json()
+    assert isinstance(body["nonce"], str)
+    assert isinstance(body["typed_data"]["message"]["nonce"], str)
+    assert body["nonce"] == body["typed_data"]["message"]["nonce"]
+
+
+def test_the_nonce_is_usually_too_big_for_a_javascript_number():
+    """Not an edge case worth guarding — it is the normal case.
+
+    A 64-bit random clears the safe range about 2047 times out of 2048, so
+    twenty draws landing inside it would mean the nonce shrank, not that the
+    test got lucky.
+    """
+    drawn = [int(sign().json()["nonce"]) for _ in range(20)]
+    assert any(n > JS_MAX_SAFE_INTEGER for n in drawn)
+
+
 def test_signature_outlives_the_qr_on_screen():
     r = sign().json()
     assert r["expiry"] > time.time() + 60
