@@ -140,6 +140,23 @@ class ScoreResponse(BaseModel):
     top_features: list[FeatureWeight]
 
 
+class WorldAttestation(BaseModel):
+    """Our signature that World confirmed this wallet is a verified human.
+
+    Returned by `POST /world/verify` and carried straight into a claim, where
+    the contract recovers the signer and checks it against the attester address
+    it trusts. Defined above `ClaimRequest` because the claim carries one.
+    """
+
+    visitor: str
+    nullifier_hash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    "Unix seconds. Short — this is meant to be used in the same session."
+    expiry: int
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+    "The full EIP-712 document, so a caller can verify what was signed."
+    typed_data: dict
+
+
 class ClaimRequest(BaseModel):
     """Everything the visitor's phone read off the QR, plus who they are.
 
@@ -155,9 +172,14 @@ class ClaimRequest(BaseModel):
     signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
     visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
     world_proof: str = Field("", max_length=4096)
-    # What the contract actually stores: one human, not one wallet. It keys the
-    # weekly 100/50/25/0 curve, so two visitors sharing a nullifier would share
-    # a payout curve. Optional only while the samples stand in for the chain.
+    # What POST /world/verify handed back, forwarded whole. The contract reads
+    # the nullifier out of this struct, so it is how a claim says which human
+    # is claiming. Required against a real chain, absent against the samples —
+    # they have no World to ask.
+    attestation: WorldAttestation | None = None
+    # Kept for the sample mode, where nothing signs anything. Against a real
+    # chain the attestation above is the only source for this value — a claim
+    # carrying both is refused rather than quietly preferring one.
     nullifier_hash: str = Field("", pattern=r"^(0x[0-9a-fA-F]{64})?$")
 
 
@@ -182,20 +204,6 @@ class WorldVerifyRequest(BaseModel):
     proof: dict
 
 
-class WorldAttestation(BaseModel):
-    """Our signature that World confirmed this wallet is a verified human.
-
-    Carried into `POST /visits/claim`, where the contract recovers the signer
-    and checks it against the attester address it trusts.
-    """
-
-    visitor: str
-    nullifier_hash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
-    "Unix seconds. Short — this is meant to be used in the same session."
-    expiry: int
-    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
-    "The full EIP-712 document, so a caller can verify what was signed."
-    typed_data: dict
 
 
 class EpochWindow(BaseModel):
