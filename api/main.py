@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -5,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api import observability, ratelimit
+from api import epoch_job, observability, ratelimit
 from api.config import cors_origin_list, get_config
 from api.routers import (
     campaigns,
@@ -32,7 +33,18 @@ async def lifespan(_: FastAPI):
     else:
         log.info("ZoneGo API up in live mode, chain %s", config.chain_id)
     log.info("CORS allows: %s", ", ".join(cors_origin_list()))
+
+    # Only in live mode: in mock mode the epoch would be built from sample
+    # wallets, which is a root over invented data — worse than no root at all,
+    # because it looks real in a log.
+    job = None
+    if not config.mock_mode:
+        job = asyncio.create_task(epoch_job.loop())
+
     yield
+
+    if job is not None:
+        job.cancel()
 
 
 app = FastAPI(
