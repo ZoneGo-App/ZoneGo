@@ -237,6 +237,20 @@ contracts/    Solidity — on branch feat/contracts-skeleton
 docker compose up                    # then localhost:8000/docs
 ```
 
+Starts in **mock mode**: every endpoint answers from the sample campaigns around
+Delancey and Orchard, with no node, no index and no keys. That is deliberate —
+anyone cloning this can see the whole product working before touching a wallet.
+
+To point it at the chain, copy `.env.example` to `.env` and fill it in. `/ready`
+then reports what is wired and what is missing, which is a different question
+from `/health` — a service can be perfectly up and unable to pay anyone.
+
+| | |
+|---|---|
+| `GET /health` | The process answers. What an uptime check watches |
+| `GET /ready` | The node, the index and the keys. What a person debugging reads |
+| `GET /metrics` | Rejected claims grouped by reason, since the process started |
+
 <details>
 <summary>Without Docker</summary>
 
@@ -287,10 +301,42 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 9 endpoints, **78 tests** | Running |
-| Subgraph — schema, ABIs, manifest, mappings | Compiles; deploy pending contract addresses |
-| Contracts | Interfaces and events; logic in progress |
-| Public deployment | Pending |
+| API — 14 endpoints, **214 tests** | Running |
+| Subgraph — 10 entities across three contracts | **Deployed and answering** |
+| Contracts — vault, registry, oracle | Deployed on Base Sepolia; World and the oracle in progress |
+| Fraud model | Trains; live inference against the subgraph in progress |
+| Public deployment | In progress |
+
+### Deployed
+
+**Base Sepolia**, blocks 46522139–46522140:
+
+```
+CampaignVault    0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0
+VisitRegistry    0xD33f2e26f11Fe011835D791EbA1BFE123479998A
+FraudOracle      0x5157504d3a9683Ca953EF5db1255dE619E110A9B
+```
+
+**Subgraph**, live on Subgraph Studio:
+
+```
+https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.1
+```
+
+Everything the product shows about the past is read from that URL. Run the same
+queries and you get the same numbers — no database of ours sits in between.
+
+### One thing we say before anyone asks
+
+Selfie Check has no on-chain proof artifact. The World ID Router verifies Orb
+credentials only, and the v4 verifier is deployed on World Chain rather than
+Base, so `VisitRegistry` cannot ask World anything. Our backend asks instead and
+signs an attestation the contract trusts.
+
+That is a real trust assumption and it is the only one in the system: on this
+one fact, the contract believes us. Everywhere else the merchant signs and the
+chain decides. The attester address is published at `/world/attester` so the
+address the contract trusts can be checked against the one actually signing.
 
 **Known and deliberate:** the fraud model trains on synthetic data with four
 injected patterns. `ml/DATA.md` documents why they are synthetic, which fraud
