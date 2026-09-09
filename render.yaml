@@ -49,9 +49,10 @@ services:
         sync: false
       - key: RELAY_PRIVATE_KEY
         sync: false
-      # Signs commitEpoch and nothing else. Separate from the two above because
-      # the damage differs: the relay costs gas, the attester mints verified
-      # humans, and this one rewrites who the model called fraudulent.
+      # Signs commitEpoch. Set it to the same value as RELAY_PRIVATE_KEY: it
+      # has its own name so it can be split later without a code change, but
+      # every key here is read from one environment by one process, so a
+      # separate one would not separate much.
       - key: FRAUD_OPERATOR_PRIVATE_KEY
         sync: false
       # The deployed frontend lives on another domain, so without this the

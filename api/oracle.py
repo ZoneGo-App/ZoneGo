@@ -5,10 +5,13 @@ worth nothing. Putting the root on chain is what turns "the model scored you
 0.7213" into something a visitor can verify against a number that was published
 before they appealed — and before we knew they would.
 
-The key here signs that publication and nothing else. It is deliberately not the
-relay and not the attester: leaking the relay costs gas, leaking the attester
-lets somebody mint verified humans, and leaking this one lets somebody rewrite
-who the model called fraudulent. Three different consequences, so three keys.
+The key that signs it has a setting of its own, and that setting currently holds
+the relay's key. A separate key would buy less than it sounds: both are read from
+the same environment by the same process, so whoever gets one gets both. What
+sharing actually costs is the nonce — the relay and this job ask the node for the
+same next number, and two sends in the same second lose one of them. One
+publication an hour keeps that window narrow, and widening it is a value to
+change rather than code to write.
 
 `commitEpoch` refuses an epoch that is not greater than the one on chain, which
 is what makes a restart safe — and what makes reading the chain first cheaper

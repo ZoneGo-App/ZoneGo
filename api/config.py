@@ -87,15 +87,18 @@ class Config(BaseSettings):
 
     # --- Epoch publication -------------------------------------------------
     #
-    # A third key, and again not a spare copy of the others. Leaking the relay
-    # costs gas; leaking the attester lets somebody mint verified humans;
-    # leaking this one lets somebody rewrite who the model called fraudulent.
-    # Three consequences, three keys.
+    # Its own setting, holding the relay's key for now. Giving it a key of its
+    # own buys less than it sounds: both are read from one environment by one
+    # process, so whoever reads either reads both, and the blast radii people
+    # imagine for separate keys are not separate here.
     #
-    # It sends one transaction an hour, so it needs a fraction of the relay's
-    # balance. Empty until Sebastián redeploys with the address of the oracle —
-    # the job runs the whole path either way and says which of the two is
-    # missing rather than failing silently every hour.
+    # What sharing does cost is the nonce. The relay and this job ask the node
+    # for the same next number, so two sends in the same second lose one of
+    # them. At one publication an hour the window is narrow enough to accept —
+    # and the day it is not, this is a value to change and not code to write.
+    #
+    # The address is empty until the oracle is redeployed. The job runs the
+    # whole path either way and logs which half is missing.
     fraud_oracle_address: str = "0x0000000000000000000000000000000000000000"
     fraud_operator_private_key: str = ""
 

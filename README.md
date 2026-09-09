@@ -301,7 +301,7 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 14 endpoints, **214 tests** | Running |
+| API — 16 endpoints, **231 tests** | Deployed and public |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
 | Contracts — vault, registry, oracle | Deployed on Base Sepolia; World and the oracle in progress |
 | Fraud model | Trains; live inference against the subgraph in progress |
@@ -343,6 +343,15 @@ injected patterns. `ml/DATA.md` documents why they are synthetic, which fraud
 literature each pattern comes from, and how real data swaps in without
 changing the pipeline. A weakness you name first stops being an attack and
 becomes rigour.
+
+**Also known, and the next thing we would fix:** the key that publishes epoch
+roots is the same one that relays claims. It has its own setting, so splitting
+it is a value to change rather than code to write — but the two would still sit
+in one environment read by one process, which is why we did not spend the day on
+it. The reason to split them is not secrecy, it is the nonce: both ask the node
+for the same next number, so two sends in the same second lose one. At one
+publication an hour that is rare. At a hundred merchants it would not be, and
+that is the point at which this stops being a footnote.
 
 ---
 
