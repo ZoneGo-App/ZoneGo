@@ -9,6 +9,19 @@ No rreal mechant descriptions exist yet, so this trains on a small synthetic
 phrase bank (document as such - see DATA.md-style rreasoning). Swapping in real onboarding text later is a data change,
 not a pipeline change: predict_rubro() takes any free-text string.
 
+FIX (Problem #1 — the urgent one): with only 8 fixed categories and no
+"none of the above" option, a description with no matching vocabulary
+(sneakers, flowers, a tattoo studio...) produced an almost-empty TF-IDF
+vector, and the model returned whichever class had the highest bias term
+regardless — eight unrelated real businesses collapsed into two categories.
+Two independent mitigations are applied below, per the review:
+  (a) predict_rubro() now checks predict_proba() against a confidence
+      threshold and returns "other" when nothing clears it — the cheapest
+      fix, and the one that matters most for the demo.
+  (b) an explicit "other" training category was added, with phrases from
+      businesses that are NOT in the 8 fixed rubros, so the model has an
+      actual "none of these" region to learn instead of only 8 slots.
+
 
 """
 import os
