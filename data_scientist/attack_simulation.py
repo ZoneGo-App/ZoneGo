@@ -108,3 +108,34 @@ def _nearest_pair(businesses: pd.DataFrame) -> tuple:
                 best = (d, a, b)
     _, a, b = best
     return a, b
+
+
+def simulate_farm_30_verified_wallets(businesses: pd.DataFrame, attack_start: datetime, target_hour: int = None) -> pd.DataFrame:
+    """30 NEW wallets, each with its OWN nullifier (30 real/distinct
+    verifications), all visiting the SAME business within a 90-minute
+    window. None reuse a nullifier with another -- on purpose, to evade
+    sybil_score.
+
+    `target_hour`, if provided, forces the attack start hour (for the
+    "intelligent attacker" scenario that purposely avoids the weird hour).
+    """
+    target = businesses.sample(1, random_state=RANDOM_STATE).iloc[0]
+    base = attack_start if target_hour is None else attack_start.replace(hour=target_hour, minute=0)
+    rows = []
+    for i in range(30):
+        w = _new_wallet()
+        n = _new_nullifier()  # unique per wallet -- truly "verified"
+        t = base + timedelta(minutes=int(np.random.default_rng(RANDOM_STATE + i).integers(0, 90)))
+        rows.append({
+            "visit_id": f"atk1_farm30_{i}",
+            "wallet": w,
+            "nullifier": n,
+            "business_id": target["business_id"],
+            "business_type": target["business_type"],
+            "lat": target["lat"],
+            "lon": target["lon"],
+            "timestamp": t,
+            "is_fraud": 1,
+            "fraud_type": "farm_30_verified_wallets",
+        })
+    return pd.DataFrame(rows)
