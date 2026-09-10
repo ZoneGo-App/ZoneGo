@@ -171,3 +171,38 @@ def simulate_self_visiting_business(businesses: pd.DataFrame, attack_start: date
                 "fraud_type": "self_visiting_business",
             })
     return pd.DataFrame(rows)
+
+def simulate_neighbor_collusion(businesses: pd.DataFrame, attack_start: datetime, hour_range: tuple = (10, 20)) -> pd.DataFrame:
+    """8 wallets alternating between EXACTLY the two closest businesses to
+    each other across the entire platform, every 20-40 minutes for 5 days --
+    close enough and fast enough so that the implied velocity looks like
+    walking between neighbors, not like impossible travel. `hour_range` is
+    the time window of the day where each daily batch of alternations starts.
+    """
+    biz_a, biz_b = _nearest_pair(businesses)
+    rng = np.random.default_rng(RANDOM_STATE + 2)
+    wallets = [_new_wallet() for _ in range(8)]
+    nullifiers = {w: _new_nullifier() for w in wallets}
+    rows = []
+    visit_n = 0
+    lo, hi = hour_range
+    for day in range(5):
+        t = attack_start + timedelta(day, hours=int(rng.integers(lo, hi)))
+        for _ in range(6):  # 6 alternations per day
+            for w in wallets:
+                biz = biz_a if (visit_n % 2 == 0) else biz_b
+                visit_n += 1
+                rows.append({
+                    "visit_id": f"atk3_neighbor_{visit_n}",
+                    "wallet": w,
+                    "nullifier": nullifiers[w],
+                    "business_id": biz["business_id"],
+                    "business_type": biz["business_type"],
+                    "lat": biz["lat"],
+                    "lon": biz["lon"],
+                    "timestamp": t,
+                    "is_fraud": 1,
+                    "fraud_type": "neighbor_collusion",
+                })
+                t = t + timedelta(minutes=int(rng.integers(20, 40)))
+    return pd.DataFrame(rows)
