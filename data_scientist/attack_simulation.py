@@ -139,3 +139,35 @@ def simulate_farm_30_verified_wallets(businesses: pd.DataFrame, attack_start: da
             "fraud_type": "farm_30_verified_wallets",
         })
     return pd.DataFrame(rows)
+
+def simulate_self_visiting_business(businesses: pd.DataFrame, attack_start: datetime, target_hour_range: tuple = (10, 19)) -> pd.DataFrame:
+    """2 new wallets (the merchant and/or a close accomplice) that visit
+    ONLY their own business, 25 times each, spread over 10 days, during normal
+    business hours (so that hour_deviation is NOT what gives them away -- the
+    point is to isolate how well business_entropy catches them alone).
+    `target_hour_range` is the range of hours of the day when visits occur.
+    """
+    target = businesses.sample(1, random_state=RANDOM_STATE + 1).iloc[0]
+    rng = np.random.default_rng(RANDOM_STATE + 1)
+    wallets = [_new_wallet(), _new_wallet()]
+    nullifiers = {w: _new_nullifier() for w in wallets}
+    rows = []
+    visit_n = 0
+    lo, hi = target_hour_range
+    for day in range(10):
+        for w in wallets:
+            visit_n += 1
+            t = attack_start + timedelta(days=day, hours=int(rng.integers(lo, hi)), minutes=int(rng.integers(0, 60)))
+            rows.append({
+                "visit_id": f"atk2_selfvisit_{visit_n}",
+                "wallet": w,
+                "nullifier": nullifiers[w],
+                "business_id": target["business_id"],
+                "business_type": target["business_type"],
+                "lat": target["lat"],
+                "lon": target["lon"],
+                "timestamp": t,
+                "is_fraud": 1,
+                "fraud_type": "self_visiting_business",
+            })
+    return pd.DataFrame(rows)
