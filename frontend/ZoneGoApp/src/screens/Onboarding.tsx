@@ -5,12 +5,12 @@ export function Onboarding() {
   const { setRole } = useRole()
   const { login } = useLogin()
 
-  const entrarComoComercio = () => {
+  const enterAsMerchant = () => {
     setRole('comercio')
     login({ loginMethods: ['email'] })
   }
 
-  const entrarComoVecino = () => {
+  const enterAsNeighbor = () => {
     setRole('vecino')
     login({ loginMethods: ['sms', 'email'] })
   }
@@ -20,24 +20,24 @@ export function Onboarding() {
       <div>
         <h1 className="text-3xl font-bold">ZoneGo</h1>
         <p className="mt-2 text-gray-600">
-          Buscá algo cerca, caminá hasta el local, y te pagan por haber ido.
+          Search for something nearby, walk to the store, and get paid for showing up.
         </p>
       </div>
 
       <div className="flex w-full max-w-xs flex-col gap-3">
         <button
           type="button"
-          onClick={entrarComoComercio}
+          onClick={enterAsMerchant}
           className="rounded-lg bg-black px-6 py-3 font-medium text-white"
         >
-          Soy un comercio
+          I'm a merchant
         </button>
         <button
           type="button"
-          onClick={entrarComoVecino}
+          onClick={enterAsNeighbor}
           className="rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-900"
         >
-          Soy un vecino
+          I'm a neighbor
         </button>
       </div>
     </div>
