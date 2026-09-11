@@ -4,6 +4,7 @@ import { useRole } from './context/RoleContext'
 import { Onboarding } from './screens/Onboarding'
 import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
+import { ScanQr } from './screens/ScanQr'
 import type { SearchHit } from './lib/api'
 
 function RoleFallback() {
@@ -52,6 +53,13 @@ function App() {
     return <RoleFallback />
   }
 
+  // Merchant side. "My panel" doesn't exist yet — scanning stands in as the
+  // merchant's only screen until it's built.
+  if (role === 'comercio') {
+    return <ScanQr />
+  }
+
+  // Neighbor side.
   if (selectedHit) {
     const visitorAddress = user?.wallet?.address
     if (!visitorAddress) {

@@ -32,10 +32,27 @@ export interface SearchHit {
 }
 
 export interface QrSignResponse {
-  typed_data: Record<string, unknown>
+  typed_data: {
+    types: Record<string, unknown>
+    primaryType: string
+    domain: Record<string, unknown>
+    message: {
+      campaignId: number
+      nonce: string
+      expiry: number
+      geohash: string
+      visitor: string
+    }
+  }
   nonce: string
   expiry: number
   rotate_after_seconds: number
+}
+
+export interface ClaimResponse {
+  tx_hash: string
+  status: string
+  relayed: boolean
 }
 
 /** Amounts from the API arrive in micro-USDC (1,000,000 = $1.00). */
@@ -86,6 +103,44 @@ export async function signQr(params: {
 
   if (!res.ok) {
     throw new Error(`QR sign failed (status ${res.status})`)
+  }
+  return res.json()
+}
+
+/**
+ * Submits a claim to the relay. `attestation` is intentionally optional here:
+ * the World identity-check screen isn't built yet, so today we always send
+ * `null`. Expect the API to reject with a "missing attestation" error until
+ * that screen exists — that error is the honest signal, not a bug.
+ */
+export async function claimVisit(params: {
+  campaignId: number
+  nonce: string
+  expiry: number
+  geohash: string
+  signature: string
+  visitor: string
+  attestation: unknown | null
+}): Promise<ClaimResponse> {
+  const url = new URL('/visits/claim', API_BASE_URL)
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      campaign_id: params.campaignId,
+      nonce: params.nonce,
+      expiry: params.expiry,
+      geohash: params.geohash,
+      signature: params.signature,
+      visitor: params.visitor,
+      attestation: params.attestation,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Claim failed (status ${res.status}): ${body}`)
   }
   return res.json()
 }
