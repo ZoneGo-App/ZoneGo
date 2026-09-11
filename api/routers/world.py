@@ -9,13 +9,54 @@ The signature is short-lived and names one wallet, so it is worth nothing to
 anyone else and worth nothing tomorrow.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
-from api import world
+from api import rp_signature, world
 from api.config import get_config
-from api.schemas import WorldAttestation, WorldVerifyRequest
+from api.schemas import (
+    WorldAttestation,
+    WorldRequest,
+    WorldRpContext,
+    WorldVerifyRequest,
+)
 
 router = APIRouter(prefix="/world", tags=["world"])
+
+
+@router.get("/rp-context", response_model=WorldRequest)
+def request_context(response: Response):
+    """What IDKit needs before it will open: our signature over one request.
+
+    World ID 4.0 refuses a request its relying party has not signed, and the key
+    cannot live in a browser. So the frontend calls this first, passes
+    `rp_context` to IDKit untouched, and opens the widget with the `app_id` and
+    `action` returned here.
+
+    Works in mock mode too: signing costs nothing and proves nothing on its
+    own — it is the verification afterwards that needs the live path.
+    """
+    config = get_config()
+    if not config.world_app_id:
+        raise HTTPException(501, "WORLD_APP_ID is not set")
+    try:
+        context = rp_signature.rp_context()
+    except rp_signature.RpSignatureError as exc:
+        raise HTTPException(501, str(exc)) from exc
+
+    # The nonce is single use. A response served again from any cache is a
+    # request World refuses, so nothing may keep a copy.
+    response.headers["Cache-Control"] = "no-store"
+    return WorldRequest(
+        app_id=config.world_app_id,
+        action=config.world_action,
+        rp_context=WorldRpContext(
+            rp_id=context.rp_id,
+            nonce=context.nonce,
+            created_at=context.created_at,
+            expires_at=context.expires_at,
+            signature=context.signature,
+        ),
+    )
 
 
 @router.post("/verify", response_model=WorldAttestation)

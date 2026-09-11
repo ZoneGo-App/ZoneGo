@@ -28,6 +28,8 @@ def pinned_settings(monkeypatch):
     monkeypatch.setattr(config, "relay_private_key", "")
     monkeypatch.setattr(config, "attester_private_key", "")
     monkeypatch.setattr(config, "world_rp_id", "")
+    monkeypatch.setattr(config, "world_app_id", "")
+    monkeypatch.setattr(config, "world_rp_signing_key", "")
     monkeypatch.setattr(config, "campaign_vault_address", ZERO_ADDRESS)
     monkeypatch.setattr(config, "visit_registry_address", ZERO_ADDRESS)
     # Node reads are memoised across calls, so a campaign cached by one test

@@ -207,6 +207,30 @@ class WorldVerifyRequest(BaseModel):
     proof: dict
 
 
+class WorldRpContext(BaseModel):
+    """The signed half of an IDKit request, shaped the way IDKit takes it.
+
+    Passed to the widget as `rp_context` without renaming a field: World checks
+    the signature over exactly these values.
+    """
+
+    rp_id: str
+    # A field element, 0x-prefixed. Single use: ask again for every request.
+    nonce: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    created_at: int
+    expires_at: int
+    # 65 bytes, r || s || v, over the message World defines.
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+
+
+class WorldRequest(BaseModel):
+    """Everything the frontend needs to open IDKit, from one call."""
+
+    app_id: str
+    # The action IDKit has to be opened with. The signature covers it, so a
+    # widget opened with any other action is refused by World.
+    action: str
+    rp_context: WorldRpContext
 
 
 class EpochWindow(BaseModel):

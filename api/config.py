@@ -67,14 +67,21 @@ class Config(BaseSettings):
     # than hiding it.
     world_app_id: str = ""
     world_rp_id: str = ""
-    # Signs the requests we send World, proving they came from ZoneGo. Their
-    # documentation is blunt about it: never expose this to client-side code.
+    # Signs every proof request before IDKit will open it — World ID 4.0 refuses
+    # unsigned ones. Their documentation is blunt about it: never expose this to
+    # client-side code, which is why the signature comes from GET
+    # /world/rp-context and not from the widget.
     world_rp_signing_key: str = ""
-    # Scopes what a person is proving. An arbitrary string, not something
-    # registered in the portal — but it has to match on all three sides.
+    # Scopes what a person is proving. In World ID 4.0 it has to exist as an
+    # action in the Developer Portal, and the same string has to appear in three
+    # places: the portal, the IDKit widget, and the request this service signs.
     world_action: str = "verify-visitor"
     world_api_url: str = "https://developer.world.org/api/v4/verify"
     world_timeout_seconds: float = 15.0
+    # How long a signed request stays openable. World's own default: long enough
+    # to scan a code and take a selfie, short enough that a context scraped off a
+    # page is dead before it is useful.
+    world_rp_request_ttl_seconds: int = 300
 
     # Signs the attestation the contract verifies. A different key from the
     # relay on purpose: leaking the relay costs gas, leaking this one lets
