@@ -23,6 +23,7 @@ from eth_account import Account
 from web3 import Web3
 from web3.exceptions import Web3Exception
 
+from api import sending
 from api.chain import ZERO_ADDRESS
 from api.config import get_config
 
@@ -147,18 +148,10 @@ def send_claim(claim: Claim) -> str:
     )
 
     try:
-        transaction = call.build_transaction(
-            {
-                "from": account.address,
-                "nonce": w3.eth.get_transaction_count(account.address),
-                "chainId": config.chain_id,
-            }
-        )
-        signed = account.sign_transaction(transaction)
-        sent = w3.eth.send_raw_transaction(signed.raw_transaction)
+        # Through `sending`, which the epoch job uses too: same key, so the
+        # nonce has to be read and spent one send at a time.
+        return sending.send(w3, account, call, chain_id=config.chain_id)
     except Web3Exception as exc:
         # Never let the underlying error carry the key or the signed payload
         # into a response body; only what the node said is safe to repeat.
         raise RelayError(f"relay failed: {exc}") from exc
-
-    return "0x" + sent.hex().removeprefix("0x")

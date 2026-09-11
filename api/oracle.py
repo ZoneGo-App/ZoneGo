@@ -8,10 +8,9 @@ before they appealed — and before we knew they would.
 The key that signs it has a setting of its own, and that setting currently holds
 the relay's key. A separate key would buy less than it sounds: both are read from
 the same environment by the same process, so whoever gets one gets both. What
-sharing actually costs is the nonce — the relay and this job ask the node for the
-same next number, and two sends in the same second lose one of them. One
-publication an hour keeps that window narrow, and widening it is a value to
-change rather than code to write.
+sharing used to cost was the nonce — two sends in the same second read the same
+number. Both paths now send through `sending`, which counts the mempool and
+spends one nonce at a time per address.
 
 `commitEpoch` refuses an epoch that is not greater than the one on chain, which
 is what makes a restart safe — and what makes reading the chain first cheaper
@@ -22,6 +21,7 @@ from eth_account import Account
 from web3 import Web3
 from web3.exceptions import Web3Exception
 
+from api import sending
 from api.chain import ZERO_ADDRESS
 from api.config import get_config
 
@@ -132,21 +132,11 @@ def commit_epoch(*, root: str, epoch: int) -> str:
     )
 
     try:
-        transaction = call.build_transaction(
-            {
-                "from": account.address,
-                "nonce": w3.eth.get_transaction_count(account.address),
-                "chainId": config.chain_id,
-            }
-        )
-        signed = account.sign_transaction(transaction)
-        sent = w3.eth.send_raw_transaction(signed.raw_transaction)
+        return sending.send(w3, account, call, chain_id=config.chain_id)
     except Web3Exception as exc:
         # This runs unattended and its errors reach a log, so never let the
         # underlying message carry the key or the signed payload with it.
         raise OracleError(f"commitEpoch failed: {exc}") from exc
-
-    return "0x" + sent.hex().removeprefix("0x")
 
 
 def operator_address() -> str:
