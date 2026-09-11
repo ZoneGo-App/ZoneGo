@@ -64,7 +64,10 @@ async def throttle_and_count(request: Request, call_next):
     # Health and metrics are what an uptime check and a person debugging use,
     # and throttling those means going blind exactly when it matters.
     if request.url.path not in ("/health", "/ready", "/metrics"):
-        client = request.client.host if request.client else "unknown"
+        client = ratelimit.client_key(
+            request.headers.get("x-forwarded-for"),
+            request.client.host if request.client else None,
+        )
         wait = ratelimit.check(client, request.url.path)
         if wait is not None:
             observability.rejected(

@@ -65,6 +65,32 @@ def test_ids_in_the_path_share_one_budget():
     assert ratelimit._bucket("/campaigns/1") == ratelimit._bucket("/campaigns/2")
 
 
+def test_two_people_behind_the_same_proxy_get_separate_budgets():
+    """Render hands every request over from one address. Keying on that address
+    would make one budget for everyone using the app."""
+    calls, _ = ratelimit.limit_for("/visits/claim")
+    first = {"X-Forwarded-For": "203.0.113.1"}
+    for _ in range(calls):
+        client.post("/visits/claim", json=A_CLAIM, headers=first)
+
+    blocked = client.post("/visits/claim", json=A_CLAIM, headers=first)
+    someone_else = client.post(
+        "/visits/claim", json=A_CLAIM, headers={"X-Forwarded-For": "203.0.113.2"}
+    )
+    assert blocked.status_code == 429
+    assert someone_else.status_code != 429
+
+
+def test_the_first_forwarded_address_is_the_client():
+    """Render puts the real client first; anything after it is a proxy hop."""
+    assert ratelimit.client_key("203.0.113.7, 10.0.0.1", "10.0.0.2") == "203.0.113.7"
+
+
+def test_without_a_proxy_the_connection_address_is_the_client():
+    assert ratelimit.client_key(None, "127.0.0.1") == "127.0.0.1"
+    assert ratelimit.client_key("  ", "127.0.0.1") == "127.0.0.1"
+
+
 def test_health_is_never_throttled():
     """Going blind exactly when a service is under load is the wrong failure."""
     for _ in range(200):

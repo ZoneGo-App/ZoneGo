@@ -47,6 +47,26 @@ def reset() -> None:
         _hits.clear()
 
 
+def client_key(forwarded_for: str | None, peer: str | None) -> str:
+    """Who is calling, as far as the proxy in front lets us see.
+
+    Behind Render every connection arrives from Render's own proxy, so the peer
+    address is the same for everybody, and a limit keyed on it is one limit for
+    the whole world — a few people browsing at once would all get 429s. Render
+    puts the real client first in X-Forwarded-For, so that is the key; the peer
+    is the fallback for running with no proxy at all.
+
+    A client can forge the header. What that buys is a way around a limit, not
+    around a payment: a claim without a merchant's signature dies at gas
+    estimation and never spends anything.
+    """
+    if forwarded_for:
+        first = forwarded_for.split(",")[0].strip()
+        if first:
+            return first
+    return peer or "unknown"
+
+
 def limit_for(path: str) -> tuple[int, float]:
     for prefix, calls, window in LIMITS:
         if path.startswith(prefix):
