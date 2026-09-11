@@ -1,6 +1,7 @@
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
 import { Onboarding } from './screens/Onboarding'
+import { Search } from './screens/Search'
 
 function RoleFallback() {
   const { setRole } = useRole()
@@ -47,11 +48,7 @@ function App() {
     return <RoleFallback />
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-gray-500">Adentro como {role} — pantalla real, siguiente paso.</p>
-    </div>
-  )
+  return <Search />
 }
 
 export default App

@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { PrivyProvider } from '@privy-io/react-auth'
+import { RoleProvider } from './context/RoleContext'
 import './index.css'
 import App from './App.tsx'
 
@@ -28,7 +29,9 @@ createRoot(document.getElementById('root')!).render(
         },
       }}
     >
-      <App />
+      <RoleProvider>
+        <App />
+      </RoleProvider>
     </PrivyProvider>
   </StrictMode>,
 )
