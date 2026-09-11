@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 if (!API_BASE_URL) {
   throw new Error(
-    'Falta VITE_API_BASE_URL. Agregala a frontend/ZoneGoApp/.env (mirá .env.example).',
+    'Missing VITE_API_BASE_URL. Add it to frontend/ZoneGoApp/.env (see .env.example).',
   )
 }
 
@@ -31,7 +31,14 @@ export interface SearchHit {
   distance_meters: number
 }
 
-/** Los montos de la API vienen en micro-USDC (1.000.000 = $1.00). */
+export interface QrSignResponse {
+  typed_data: Record<string, unknown>
+  nonce: string
+  expiry: number
+  rotate_after_seconds: number
+}
+
+/** Amounts from the API arrive in micro-USDC (1,000,000 = $1.00). */
 export function formatUsd(microUsd: number): string {
   return `$${(microUsd / 1_000_000).toFixed(2)}`
 }
@@ -57,7 +64,28 @@ export async function searchCampaigns(params: {
 
   const res = await fetch(url)
   if (!res.ok) {
-    throw new Error(`La búsqueda falló (status ${res.status})`)
+    throw new Error(`Search failed (status ${res.status})`)
+  }
+  return res.json()
+}
+
+export async function signQr(params: {
+  campaignId: number
+  visitor: string
+}): Promise<QrSignResponse> {
+  const url = new URL('/qr/sign', API_BASE_URL)
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      campaign_id: params.campaignId,
+      visitor: params.visitor,
+    }),
+  })
+
+  if (!res.ok) {
+    throw new Error(`QR sign failed (status ${res.status})`)
   }
   return res.json()
 }
