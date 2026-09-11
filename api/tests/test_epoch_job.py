@@ -5,6 +5,9 @@ not that it publishes — it is that it never takes the API down with it. A judg
 opening the link during a subgraph hiccup should find a working service.
 """
 
+import asyncio
+import time
+
 import pytest
 
 from api import epoch_job, epochs, oracle
@@ -154,6 +157,28 @@ def test_it_never_runs_the_open_epoch(monkeypatch):
     monkeypatch.setattr(epochs, "build", spy)
     epoch_job.run_once()
     assert seen["epoch"] < epochs.current_epoch()
+
+
+def test_a_slow_tick_does_not_freeze_the_server(monkeypatch):
+    """The job shares the event loop with every request, so its blocking calls
+    have to happen somewhere else. Otherwise a slow subgraph is a frozen API."""
+
+    def slow_tick():
+        time.sleep(0.5)
+        return False
+
+    monkeypatch.setattr(epoch_job, "run_once", slow_tick)
+
+    async def scenario():
+        started = time.monotonic()
+        job = asyncio.create_task(epoch_job.loop())
+        # Stands in for a request being served while the tick is running.
+        await asyncio.sleep(0.05)
+        waited = time.monotonic() - started
+        job.cancel()
+        return waited
+
+    assert asyncio.run(scenario()) < 0.3
 
 
 def test_the_tick_is_shorter_than_an_epoch():

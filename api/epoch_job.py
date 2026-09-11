@@ -124,7 +124,11 @@ async def loop() -> None:
     while True:
         started = time.monotonic()
         try:
-            run_once()
+            # In a worker thread: the subgraph and node calls inside are
+            # blocking, and this coroutine shares the event loop with every
+            # request. Called inline, a slow index froze the whole API for as
+            # long as the call took — every minute, if the node was failing.
+            await asyncio.to_thread(run_once)
         except Exception as exc:  # noqa: BLE001
             observability.log.warning("epoch_tick_failed", extra={"error": str(exc)})
         await asyncio.sleep(max(1.0, TICK_SECONDS - (time.monotonic() - started)))
