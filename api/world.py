@@ -98,6 +98,27 @@ def _bind(nullifier_hash: str, visitor: str) -> None:
     _bound[key] = visitor.lower()
 
 
+def normalize_nullifier(value: object) -> str:
+    """World's nullifier as the bytes32 hex the contract stores.
+
+    World pads nullifiers to 64 digits itself (developer-portal,
+    web/api/helpers/verify.ts), so an unpadded answer is padded here the same
+    way. It must never be signed as it came: `encode_typed_data` pads a short
+    bytes32 silently, so the attestation would be signed over one value and
+    reported with another, and the response would fail validation after the
+    signature already existed.
+    """
+    text = str(value).strip()
+    digits = text[2:] if text.lower().startswith("0x") else ""
+    if not digits or len(digits) > 64:
+        raise WorldError("World returned a nullifier that is not 32 bytes of hex")
+    try:
+        number = int(digits, 16)
+    except ValueError:
+        raise WorldError("World returned a nullifier that is not hex") from None
+    return "0x" + format(number, "064x")
+
+
 def verify_with_world(idkit_response: dict) -> str:
     """Ask World whether this proof is real, and return the nullifier.
 
@@ -108,6 +129,16 @@ def verify_with_world(idkit_response: dict) -> str:
     config = get_config()
     if not config.world_rp_id:
         raise WorldError("WORLD_RP_ID is not set")
+
+    # A person's nullifier is different for every action. Accepting a proof for
+    # any action under our app would let one human bind one wallet per action,
+    # which is the wallet farm World exists to stop — so refuse it before
+    # spending a request on World's quota.
+    requested = idkit_response.get("action")
+    if requested is not None and requested != config.world_action:
+        raise WorldError(
+            f"proof is for action {requested!r}, expected {config.world_action!r}"
+        )
 
     url = f"{config.world_api_url.rstrip('/')}/{config.world_rp_id}"
     try:
@@ -127,12 +158,19 @@ def verify_with_world(idkit_response: dict) -> str:
         detail = body.get("detail") or body.get("code") or response.text[:200]
         raise WorldError(f"World rejected the proof: {detail}")
 
+    answered = body.get("action")
+    if answered is not None and answered != config.world_action:
+        # The same fence as above, checked on World's side of the exchange.
+        raise WorldError(
+            f"World verified action {answered!r}, expected {config.world_action!r}"
+        )
+
     nullifier = body.get("nullifier")
     if not nullifier:
         # Success without a nullifier is nonsense: the nullifier is the whole
         # answer. Better to fail here than to sign an attestation over nothing.
         raise WorldError("World returned success with no nullifier")
-    return nullifier
+    return normalize_nullifier(nullifier)
 
 
 def build_typed_data(*, visitor: str, nullifier_hash: str, expiry: int) -> dict:

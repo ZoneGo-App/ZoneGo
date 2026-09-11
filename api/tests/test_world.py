@@ -57,6 +57,40 @@ def verified(nullifier=NULLIFIER):
 # --- talking to World -------------------------------------------------------
 
 
+def test_a_proof_for_another_action_is_refused_before_asking_world(live, monkeypatch):
+    """Nullifiers differ per action, so any action would mean a wallet per action."""
+    asked = []
+    monkeypatch.setattr(httpx, "post", lambda *args, **kwargs: asked.append(args))
+    r = client.post(
+        "/world/verify",
+        json={"visitor": VISITOR, "proof": {**A_PROOF, "action": "claim-airdrop"}},
+    )
+    assert r.status_code == 502
+    assert asked == []
+
+
+def test_world_answering_for_another_action_is_refused(live, monkeypatch):
+    world_says(monkeypatch, {**verified(), "action": "claim-airdrop"})
+    r = client.post("/world/verify", json={"visitor": VISITOR, "proof": A_PROOF})
+    assert r.status_code == 502
+
+
+def test_a_short_nullifier_is_padded_the_way_world_pads_it(live, monkeypatch):
+    """Signed as padded and reported as padded — never one value each."""
+    world_says(monkeypatch, verified(nullifier="0x" + "ab" * 31))
+    body = client.post(
+        "/world/verify", json={"visitor": VISITOR, "proof": A_PROOF}
+    ).json()
+    assert body["nullifier_hash"] == "0x00" + "ab" * 31
+    assert body["typed_data"]["message"]["nullifierHash"] == body["nullifier_hash"]
+
+
+def test_a_nullifier_that_is_not_hex_is_a_502_not_a_crash(live, monkeypatch):
+    world_says(monkeypatch, verified(nullifier="not-a-nullifier"))
+    r = client.post("/world/verify", json={"visitor": VISITOR, "proof": A_PROOF})
+    assert r.status_code == 502
+
+
 def test_a_verified_human_gets_an_attestation(live, monkeypatch):
     world_says(monkeypatch, verified())
     body = client.post(
