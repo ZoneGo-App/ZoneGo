@@ -144,3 +144,13 @@ export async function claimVisit(params: {
   }
   return res.json()
 }
+
+export async function fetchCampaigns(): Promise<Campaign[]> {
+  const url = new URL('/campaigns', API_BASE_URL)
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`Fetching campaigns failed (status ${res.status})`)
+  }
+  return res.json()
+
+}

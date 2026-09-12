@@ -5,6 +5,7 @@ import { Onboarding } from './screens/Onboarding'
 import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
 import { ScanQr } from './screens/ScanQr'
+import { MerchantPanel } from './screens/MerchantPanel'
 import type { SearchHit } from './lib/api'
 
 function RoleFallback() {
@@ -36,6 +37,7 @@ function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
+  const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
 
   if (!ready) {
     return (
@@ -53,10 +55,17 @@ function App() {
     return <RoleFallback />
   }
 
-  // Merchant side. "My panel" doesn't exist yet — scanning stands in as the
-  // merchant's only screen until it's built.
+  // Merchant side.
   if (role === 'comercio') {
-    return <ScanQr />
+    if (merchantView === 'scan') {
+      return <ScanQr />
+    }
+    return (
+      <MerchantPanel
+        merchantAddress={import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''}
+        onGoToScan={() => setMerchantView('scan')}
+      />
+    )
   }
 
   // Neighbor side.
