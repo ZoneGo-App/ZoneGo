@@ -89,4 +89,47 @@ contract CampaignVaultTest is Test {
         vm.expectRevert("zero radius");
         vault.createCampaign(1e6, 10e6, bytes32(0), 0);
     }
+
+    function test_PauseByStrangerReverts() public {
+        vm.prank(merchant);
+        uint256 campaignId = vault.createCampaign(1e6, 10e6, bytes32(0), 1000);
+
+        vm.prank(stranger);
+        vm.expectRevert("not merchant");
+        vault.pauseCampaign(campaignId);
+    }
+
+    function test_PauseBlocksPayReward() public {
+        address registry = address(0x42);
+        vault.setVisitRegistry(registry);
+
+        vm.startPrank(merchant);
+        uint256 campaignId = vault.createCampaign(1e6, 10e6, bytes32(0), 1000);
+        usdc.approve(address(vault), 100e6);
+        vault.fund(campaignId, 100e6);
+        vault.pauseCampaign(campaignId);
+        vm.stopPrank();
+
+        vm.prank(registry);
+        vm.expectRevert(CampaignVault.CampaignPausedError.selector);
+        vault.payReward(campaignId, address(0x99), 1e6);
+    }
+
+    function test_UnpauseRestoresPayReward() public {
+        address registry = address(0x42);
+        vault.setVisitRegistry(registry);
+
+        vm.startPrank(merchant);
+        uint256 campaignId = vault.createCampaign(1e6, 10e6, bytes32(0), 1000);
+        usdc.approve(address(vault), 100e6);
+        vault.fund(campaignId, 100e6);
+        vault.pauseCampaign(campaignId);
+        vault.unpauseCampaign(campaignId);
+        vm.stopPrank();
+
+        vm.prank(registry);
+        vault.payReward(campaignId, address(0x99), 1e6);
+
+        assertEq(usdc.balanceOf(address(0x99)), 1e6);
+    }
 }

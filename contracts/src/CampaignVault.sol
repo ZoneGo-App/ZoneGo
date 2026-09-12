@@ -21,11 +21,16 @@ contract CampaignVault {
     }
 
     mapping(uint256 => Campaign) public campaigns;
+    mapping(uint256 => bool) public paused;
     uint256 public nextCampaignId = 1;
 
     event CampaignCreated(uint256 indexed campaignId, address indexed merchant, uint256 rewardPerVisit, uint256 dailyCap, bytes32 geohash, uint256 radius);
     event CampaignFunded(uint256 indexed campaignId, address indexed merchant, uint256 amount);
     event CampaignWithdrawn(uint256 indexed campaignId, address indexed merchant, uint256 amount);
+    event CampaignPaused(uint256 indexed campaignId);
+    event CampaignUnpaused(uint256 indexed campaignId);
+
+    error CampaignPausedError();
 
     constructor(address _usdc) {
         USDC = IERC20(_usdc);
@@ -81,8 +86,23 @@ contract CampaignVault {
     function payReward(uint256 campaignId, address to, uint256 amount) external {
         require(msg.sender == visitRegistry, "not registry");
         Campaign storage c = campaigns[campaignId];
+        if (paused[campaignId]) revert CampaignPausedError();
         require(c.balance >= amount, "insufficient balance");
         c.balance -= amount;
         USDC.safeTransfer(to, amount);
+    }
+
+    function pauseCampaign(uint256 campaignId) external {
+        Campaign storage c = campaigns[campaignId];
+        require(msg.sender == c.merchant, "not merchant");
+        paused[campaignId] = true;
+        emit CampaignPaused(campaignId);
+    }
+
+    function unpauseCampaign(uint256 campaignId) external {
+        Campaign storage c = campaigns[campaignId];
+        require(msg.sender == c.merchant, "not merchant");
+        paused[campaignId] = false;
+        emit CampaignUnpaused(campaignId);
     }
 }
