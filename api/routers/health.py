@@ -85,7 +85,10 @@ def _subgraph(config) -> str:
             timeout=config.subgraph_timeout_seconds,
         )
         return "ok" if r.status_code < 400 else f"http {r.status_code}"
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
+        # InvalidURL means the setting is malformed rather than the service
+        # being down. /ready exists to say which, so it must not be the one
+        # endpoint that dies of it.
         return f"unreachable: {type(exc).__name__}"
 
 

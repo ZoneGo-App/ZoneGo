@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -117,6 +118,24 @@ class Config(BaseSettings):
     # whole path either way and logs which half is missing.
     fraud_oracle_address: str = "0x0000000000000000000000000000000000000000"
     fraud_operator_private_key: str = ""
+
+    @field_validator("subgraph_url", "rpc_url", "world_api_url", mode="before")
+    @classmethod
+    def _trim(cls, value):
+        """A URL pasted into a dashboard field arrives with what came with it.
+
+        A trailing newline is the expensive one. httpx raises InvalidURL for it,
+        and InvalidURL does not inherit from httpx.HTTPError — so the handler
+        written to turn an upstream failure into a 502 does not catch it, and
+        every route that reads the index answers 500 instead. That is a
+        configuration typo wearing the costume of a broken service, and it cost
+        us an afternoon once already with the World signing key.
+
+        Quotes go too: a value copied with them is never meant to include them.
+        """
+        if isinstance(value, str):
+            return value.strip().strip('"').strip("'").strip()
+        return value
 
 
 @lru_cache

@@ -100,7 +100,10 @@ def run(document: str, variables: dict[str, Any]) -> dict[str, Any]:
         )
         response.raise_for_status()
         body = response.json()
-    except httpx.HTTPError as exc:
+    # InvalidURL is not an HTTPError — it is a plain Exception — so listing it
+    # separately is the difference between a 502 that names a bad SUBGRAPH_URL
+    # and a 500 that names nothing.
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
         raise SubgraphError(f"subgraph request failed: {exc}") from exc
 
     # GraphQL answers 200 with an errors array, so a failed query looks like a
