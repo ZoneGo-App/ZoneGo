@@ -1,38 +1,39 @@
-# requirements.txt — pipeline de fraude ZoneGo
+# requirements.txt — ZoneGo fraud pipeline
 #
 # pip install -r requirements.txt
 #
-# Versiones EXACTAS (==), no ">=": un .joblib serializa objetos internos
-# de pandas/sklearn/numpy, y esos formatos internos cambian entre
-# versiones (ej. StringDtype cambió de representación entre pandas 2.x y
-# 3.x). Con ">=" cada quien instala una versión distinta a la que generó
-# el modelo, y el .joblib no carga en la otra máquina — esto ya pasó una
-# vez. Por eso además NO se sube ningún .joblib al repo (ver sección
-# "Cómo regenerar el modelo" más abajo): así el problema desaparece del
-# todo, en vez de solo mitigarse con el pin de versión.
+# Use EXACT versions (==), not ">=": a .joblib file serializes internal
+# objects from pandas/sklearn/numpy, and those internal formats change
+# between versions (e.g., StringDtype changed its representation between
+# pandas 2.x and 3.x). With ">=", different users might install a version
+# other than the one used to generate the model, causing the .joblib file
+# to fail to load on another machine—this has happened before. That is
+# also why no .joblib files are committed to the repo (see the "How to
+# regenerate the model" section below): this eliminates the problem
+# entirely, rather than just mitigating it via version pinning.
 #
-# Versiones exactas obtenidas con `pip freeze` en el entorno donde se
-# generó y probó este pipeline (python3 generate.py && python3 train.py
-# corridos de punta a punta, ver README.md):
+# Exact versions obtained using `pip freeze` in the environment where
+# this pipeline was generated and tested (python3 generate.py &&
+# python3 train.py run end-to-end; see README.md):
 pandas==3.0.2
 numpy==2.4.4
 scikit-learn==1.8.0
 joblib==1.5.3
 requests==2.33.1
 
-# fastapi/uvicorn (solo hacen falta para score.py, la API -- no para
-# entrenar ni para generar datos): no las tengo instaladas en el entorno
-# donde probé el resto, así que no puedo darte una versión exacta
-# validada por mí. Instálalas, corré `pip freeze | grep -iE "fastapi|uvicorn"`
-# una vez, y pineá esas dos líneas con == igual que las de arriba —
-# mismo motivo, aunque acá el riesgo es menor (no serializan nada en el
+# fastapi/uvicorn (only needed for score.py, the API -- not for
+# training or generating data): I don't have them installed in the environment
+# where I tested the rest, so I can't give you an exact version
+# validated by me. Install them, run `pip freeze | grep -iE "fastapi|uvicorn"`
+# once, and pin those two lines with == just like above —
+# same reason, although here the risk is lower (they don't serialize anything in the
 # .joblib).
 fastapi>=0.110
 uvicorn>=0.29
 
 # --------------------------------------------------------------------
-# Cómo regenerar fraud_model.joblib (no viene en el repo, a propósito):
-#   python3 generate.py   # crea visits.csv (~20,000 filas, unos segundos)
-#   python3 train.py      # entrena y guarda fraud_model.joblib (~40 segundos)
-# Con las versiones exactas de arriba instaladas, el resultado es
-# reproducible en cualquier máquina sin depender de un binario compartido.
+# How to regenerate fraud_model.joblib (intentionally excluded from the repo):
+#   python3 generate.py   # creates visits.csv (~20,000 rows, a few seconds)
+#   python3 train.py      # trains and saves fraud_model.joblib (~40 seconds)
+# With the exact versions listed above installed, the result is
+# reproducible on any machine without relying on a shared binary.
