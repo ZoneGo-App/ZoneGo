@@ -1,0 +1,38 @@
+# requirements.txt — pipeline de fraude ZoneGo
+#
+# pip install -r requirements.txt
+#
+# Versiones EXACTAS (==), no ">=": un .joblib serializa objetos internos
+# de pandas/sklearn/numpy, y esos formatos internos cambian entre
+# versiones (ej. StringDtype cambió de representación entre pandas 2.x y
+# 3.x). Con ">=" cada quien instala una versión distinta a la que generó
+# el modelo, y el .joblib no carga en la otra máquina — esto ya pasó una
+# vez. Por eso además NO se sube ningún .joblib al repo (ver sección
+# "Cómo regenerar el modelo" más abajo): así el problema desaparece del
+# todo, en vez de solo mitigarse con el pin de versión.
+#
+# Versiones exactas obtenidas con `pip freeze` en el entorno donde se
+# generó y probó este pipeline (python3 generate.py && python3 train.py
+# corridos de punta a punta, ver README.md):
+pandas==3.0.2
+numpy==2.4.4
+scikit-learn==1.8.0
+joblib==1.5.3
+requests==2.33.1
+
+# fastapi/uvicorn (solo hacen falta para score.py, la API -- no para
+# entrenar ni para generar datos): no las tengo instaladas en el entorno
+# donde probé el resto, así que no puedo darte una versión exacta
+# validada por mí. Instálalas, corré `pip freeze | grep -iE "fastapi|uvicorn"`
+# una vez, y pineá esas dos líneas con == igual que las de arriba —
+# mismo motivo, aunque acá el riesgo es menor (no serializan nada en el
+# .joblib).
+fastapi>=0.110
+uvicorn>=0.29
+
+# --------------------------------------------------------------------
+# Cómo regenerar fraud_model.joblib (no viene en el repo, a propósito):
+#   python3 generate.py   # crea visits.csv (~20,000 filas, unos segundos)
+#   python3 train.py      # entrena y guarda fraud_model.joblib (~40 segundos)
+# Con las versiones exactas de arriba instaladas, el resultado es
+# reproducible en cualquier máquina sin depender de un binario compartido.
