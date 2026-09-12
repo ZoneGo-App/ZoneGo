@@ -132,7 +132,13 @@ def load_events_from_csv(path: str, require_label: bool = True) -> pd.DataFrame:
     return df[cols].copy()
 
 
-def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_pages: int = 1000) -> pd.DataFrame:
+def load_events_from_subgraph(
+    subgraph_url: str,
+    page_size: int = 1000,
+    max_pages: int = 1000,
+    since_timestamp: int = 0,
+    since_id: str = "",
+) -> pd.DataFrame:
     """Adapter: subgraph (GraphQL) -> canonical event schema.
 
     This is the LIVE data source. The Graph's requirement is textual:
@@ -169,20 +175,34 @@ def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_page
     NOTE: field names match the ACTUAL deployed subgraph
     (api.studio.thegraph.com/query/1758817/zone-go/v0.0.1). The cursor
     query above uses graph-node's `or` where-combinator for the tiebreak
-    branch — standard in current graph-node versions, but I have not been
-    able to re-verify this exact query against the live endpoint myself (no
-    network access to thegraph.com from this environment); the team's own
-    report of the skip=5000 ceiling was empirical evidence from THEM
-    running the previous version live, not something I could reproduce
-    here. Re-confirm this cursor query directly against the deployed
-    subgraph before trusting it fully — if `or` isn't supported by this
-    graph-node version, it fails with a clear GraphQL schema error, not a
-    silent wrong result.
+    branch — standard in current graph-node versions. VALIDATED: the team
+    confirmed the `or:` combinator is accepted by the live deployed
+    subgraph, tested with `lastId` as both String and Bytes — both pass.
+
+    `since_timestamp`/`since_id`: resume the cursor from a previous call
+    instead of always starting the backfill from zero. The cursor this
+    function returns is just the last row of the DataFrame it hands back
+    (already sorted ascending by timestamp, with `id` ties broken the same
+    way the query does) — a caller doing incremental refreshes reads
+    `df.iloc[-1][['timestamp', 'visit_id']]` from one call and passes it
+    as `since_timestamp`/`since_id` on the next, and only pays for
+    whatever's new since then instead of the whole history every time.
+    Defaults (0, "") reproduce the old from-scratch behavior.
+
+    STILL OPEN, per the team: this cursor's correctness assumes graph-node
+    breaks same-timestamp ties in `id` order — true by construction (id is
+    part of the ORDER BY specifically to make cursor pagination
+    deterministic), and confirmed against a 3,500-row / 1,500-way-tie test
+    scenario, but not yet confirmed against real indexed visits (the
+    deployed subgraph has 0 so far — campaign 1 at Delancey is indexed,
+    visits aren't, pending the contracts redeploy). Re-check this once real
+    visits exist; if graph-node's tie-breaking ever differed, `id_gt`
+    dropping true duplicates is the failure mode to watch for.
     """
     rows = []
     skipped = 0
-    last_timestamp = 0
-    last_id = ""
+    last_timestamp = since_timestamp
+    last_id = since_id
 
     for page in range(max_pages):
         try:
