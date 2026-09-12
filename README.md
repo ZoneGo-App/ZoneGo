@@ -304,24 +304,34 @@ Honest, because a judge will find out anyway.
 | API — 17 endpoints, **269 tests** | **Live** at `zonego-api.onrender.com` |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
 | World ID 4.0 | Request signing live and pinned to World's own vectors; the end-to-end flow waits on the frontend |
-| Contracts — vault, registry, oracle | Written and tested; the versions on chain predate them, so a redeploy is pending |
+| Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |
 | Fraud model | Trains; live inference against the subgraph in progress |
 
 ### Deployed
 
-**Base Sepolia**, blocks 46522139–46522140:
+**Base Sepolia**, block 46725201:
 
 ```
-CampaignVault    0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0
-VisitRegistry    0xD33f2e26f11Fe011835D791EbA1BFE123479998A
-FraudOracle      0x5157504d3a9683Ca953EF5db1255dE619E110A9B
+CampaignVault    0x7b4aaDDe248818bAD121431eAd1a3A865914c419
+VisitRegistry    0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e
+FraudOracle      0xfD18B748C0868C64d0bC5a68896CF3aF1d776243
 ```
 
-These three are the first deployment, and the contracts have moved since: the
-registry on chain still takes the older `claim`, and the oracle there is the
-skeleton whose `commitEpoch` reverts. The addresses are replaced here the day
-they are redeployed — printed rather than quietly left stale, because anybody
-can read the bytecode and see which version answers.
+For a week these addresses held an older build, and this section said so. They
+no longer do, and what replaced the confession is something checkable rather
+than a claim: read the bytecode yourself.
+
+```
+VisitRegistry.TRUSTED_ATTESTER()  0x73fD1ccA35A40d97147C187BeFC3Ea4c4317d5e3
+VisitRegistry.VAULT()             0x7b4aaDDe248818bAD121431eAd1a3A865914c419
+FraudOracle.OPERATOR()            0xB3B3386d89200Dea2400FA0afFB5e03621cbDE02
+```
+
+The attester is the address this API signs World attestations with, published
+at `/world/attester`, and the registry takes attestations from that address
+and no other. The operator is the only address `commitEpoch` accepts. Both are
+immutable in the contracts — which means the trust in this system is a pair of
+addresses anybody can read, not a promise in a README.
 
 **Subgraph**, live on Subgraph Studio:
 

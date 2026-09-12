@@ -26,16 +26,16 @@ services:
       - key: SUBGRAPH_URL
         value: https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.1
       - key: CAMPAIGN_VAULT_ADDRESS
-        value: "0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0"
+        value: "0x7b4aaDDe248818bAD121431eAd1a3A865914c419"
       - key: VISIT_REGISTRY_ADDRESS
-        value: "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
+        value: "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
       - key: WORLD_ACTION
         value: verify-visitor
-      # Left for the dashboard, unlike the two above: the oracle does not exist
-      # yet. It arrives with Sebastián's redeploy, and so do new values for the
-      # vault and the registry — all three change together.
+      # The oracle exists now, so it sits here with the other two rather than in
+      # the dashboard: an address is public, and all three were deployed in the
+      # same block and change together.
       - key: FRAUD_ORACLE_ADDRESS
-        sync: false
+        value: "0xfD18B748C0868C64d0bC5a68896CF3aF1d776243"
       # `sync: false` means Render asks for the value in the dashboard instead of
       # reading it from here. Anything secret goes in this list and nowhere else
       # — this file is committed.
