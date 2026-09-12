@@ -19,10 +19,11 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
   const [signed, setSigned] = useState<QrSignResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     let cancelled = false
+    let refreshTimeout: ReturnType<typeof setTimeout> | null = null
 
     async function fetchQr() {
       try {
@@ -34,6 +35,10 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
         setSigned(result)
         setError(null)
         setSecondsLeft(result.rotate_after_seconds)
+        // Schedule the next refresh using the interval the server actually
+        // returned, not a value assumed ahead of time — this used to read
+        // `signed` from a stale closure and always fell back to 30s.
+        refreshTimeout = setTimeout(fetchQr, result.rotate_after_seconds * 1000)
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Could not load the QR code')
@@ -42,27 +47,23 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
     }
 
     fetchQr()
-    const rotationMs = (signed?.rotate_after_seconds ?? 30) * 1000
-    const refetchTimer = setInterval(fetchQr, rotationMs)
 
     return () => {
       cancelled = true
-      clearInterval(refetchTimer)
+      if (refreshTimeout) clearTimeout(refreshTimeout)
     }
-    // Re-runs only when the campaign or visitor changes, not on every `signed` update.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign.campaign_id, visitorAddress])
 
   useEffect(() => {
-    if (timerRef.current) clearInterval(timerRef.current)
+    if (countdownRef.current) clearInterval(countdownRef.current)
     if (!signed) return
 
-    timerRef.current = setInterval(() => {
+    countdownRef.current = setInterval(() => {
       setSecondsLeft((s) => (s > 0 ? s - 1 : 0))
     }, 1000)
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (countdownRef.current) clearInterval(countdownRef.current)
     }
   }, [signed])
 

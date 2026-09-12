@@ -83,7 +83,7 @@ export function ScanQr() {
         types: typedData.types,
         primaryType: typedData.primaryType,
         message: typedData.message,
-      } as never)
+      })
 
       setStep({ kind: 'submitting' })
 

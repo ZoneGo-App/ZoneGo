@@ -30,16 +30,21 @@ function buildFakeAttestation(visitor: string): WorldAttestation {
 
 /**
  * Only mounted once a fresh rp_context is in hand — the nonce is single-use
- * and expires in 300 seconds, so each attempt needs its own.
+ * and expires in 300 seconds, so each attempt needs its own. If World rejects
+ * the check, `onRetry` asks the parent for a brand new rp_context and remounts
+ * this component (via a changed `key`), rather than reopening this same hook
+ * instance with its already-consumed nonce.
  */
 function SelfieCheckWidget({
   rpData,
   visitorAddress,
   onVerified,
+  onRetry,
 }: {
   rpData: WorldRpContextResponse
   visitorAddress: string
   onVerified: (a: WorldAttestation) => void
+  onRetry: () => void
 }) {
   const [backendError, setBackendError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -71,6 +76,21 @@ function SelfieCheckWidget({
 
   const isBusy = flow.isAwaitingUserConnection || flow.isAwaitingUserConfirmation || submitting
 
+  if (flow.isError) {
+    return (
+      <>
+        <p className="text-sm text-red-600">We couldn't verify you ({flow.errorCode}).</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-2 rounded-lg bg-black px-6 py-3 font-medium text-white"
+        >
+          Try again
+        </button>
+      </>
+    )
+  }
+
   return (
     <>
       {flow.isAwaitingUserConnection && flow.connectorURI && (
@@ -88,9 +108,6 @@ function SelfieCheckWidget({
 
       {flow.isSuccess && !backendError && (
         <p className="text-sm text-gray-500">Confirming with our server...</p>
-      )}
-      {flow.isError && (
-        <p className="text-sm text-red-600">We couldn't verify you ({flow.errorCode}).</p>
       )}
       {backendError && <p className="text-sm text-red-600">{backendError}</p>}
 
@@ -166,7 +183,13 @@ export function IdentityCheck({ visitorAddress, onVerified }: IdentityCheckProps
 
       <div className="flex w-full max-w-xs flex-col items-center gap-3">
         {rpData && (
-          <SelfieCheckWidget rpData={rpData} visitorAddress={visitorAddress} onVerified={onVerified} />
+          <SelfieCheckWidget
+            key={attempt}
+            rpData={rpData}
+            visitorAddress={visitorAddress}
+            onVerified={onVerified}
+            onRetry={() => setAttempt((a) => a + 1)}
+          />
         )}
 
         {import.meta.env.DEV && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { searchCampaigns, formatUsd, formatDistance, type SearchHit } from '../lib/api'
 
 const RADIUS_OPTIONS_KM = [1, 5, 10] as const
+const SEARCH_DEBOUNCE_MS = 400
 
 function useCoords() {
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null)
@@ -29,6 +30,18 @@ function useCoords() {
   return { coords, error }
 }
 
+/** Delays following a fast-changing value, without delaying the render of the input itself. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(timeoutId)
+  }, [value, delayMs])
+
+  return debounced
+}
+
 interface SearchProps {
   onSelectCampaign: (hit: SearchHit) => void
 }
@@ -36,6 +49,7 @@ interface SearchProps {
 export function Search({ onSelectCampaign }: SearchProps) {
   const [radiusKm, setRadiusKm] = useState<1 | 5 | 10>(1)
   const [query, setQuery] = useState('')
+  const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
   const { coords, error: locationError } = useCoords()
   const [results, setResults] = useState<SearchHit[]>([])
   const [loading, setLoading] = useState(false)
@@ -48,7 +62,7 @@ export function Search({ onSelectCampaign }: SearchProps) {
     setLoading(true)
     setError(null)
 
-    searchCampaigns({ lat: coords.lat, lon: coords.lon, radiusKm, query })
+    searchCampaigns({ lat: coords.lat, lon: coords.lon, radiusKm, query: debouncedQuery })
       .then((hits) => {
         if (!cancelled) setResults(hits)
       })
@@ -62,7 +76,7 @@ export function Search({ onSelectCampaign }: SearchProps) {
     return () => {
       cancelled = true
     }
-  }, [coords, radiusKm, query])
+  }, [coords, radiusKm, debouncedQuery])
 
   return (
     <div className="min-h-screen px-4 py-6">

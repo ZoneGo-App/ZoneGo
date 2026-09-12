@@ -33,7 +33,7 @@ export interface SearchHit {
 
 export interface QrSignResponse {
   typed_data: {
-    types: Record<string, unknown>
+    types: Record<string, { name: string; type: string }[]>
     primaryType: string
     domain: Record<string, unknown>
     message: {
@@ -195,12 +195,12 @@ export async function verifyWorld(params: {
   return res.json()
 }
 
-const WORLD_API_BASE_URL = 'https://zonego-api.onrender.com'
+// Defaults to Lucio's deployed API even in local dev — the local mock API
+// doesn't implement this endpoint. Override with VITE_WORLD_API_BASE_URL if
+// that ever changes, instead of editing this file.
+const WORLD_API_BASE_URL =
+  import.meta.env.VITE_WORLD_API_BASE_URL || 'https://zonego-api.onrender.com'
 
-/**
- * Always hits Lucio's deployed API, not the local mock one — this endpoint
- * doesn't depend on chain state, and it's the only place it exists today.
- */
 export async function fetchWorldRpContext(): Promise<WorldRpContextResponse> {
   const res = await fetch(new URL('/world/rp-context', WORLD_API_BASE_URL))
   if (!res.ok) {
