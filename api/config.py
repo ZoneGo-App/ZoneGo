@@ -18,7 +18,16 @@ class Config(BaseSettings):
 
     # Seconds a subgraph answer is reused. Search and the merchant panel ask
     # for the same campaigns within the same second.
-    subgraph_cache_seconds: float = 5.0
+    #
+    # Thirty rather than five because Studio allows 3,000 queries a day and a
+    # five second window lets one query shape spend 720 of them an hour. A
+    # weekend of judges clicking around would exhaust the quota by lunchtime,
+    # and the endpoint that fails then is search — the front door.
+    #
+    # What it costs is that a campaign created or funded just now takes up to
+    # thirty seconds to appear in the list. Reading one campaign is unaffected:
+    # that route overlays the vault's answer on top of the index.
+    subgraph_cache_seconds: float = 30.0
     subgraph_timeout_seconds: float = 8.0
 
     # Comma separated. The deployed frontend lives on its own domain, so this
