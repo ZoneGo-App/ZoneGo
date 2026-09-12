@@ -1,14 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { signQr, formatUsd, type QrSignResponse, type Campaign } from '../lib/api'
+import {
+  signQr,
+  formatUsd,
+  type QrSignResponse,
+  type Campaign,
+  type WorldAttestation,
+} from '../lib/api'
 
 interface MyQrProps {
   visitorAddress: string
   campaign: Campaign
+  attestation: WorldAttestation
   onBack: () => void
 }
 
-export function MyQr({ visitorAddress, campaign, onBack }: MyQrProps) {
+export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProps) {
   const [signed, setSigned] = useState<QrSignResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
@@ -81,7 +88,10 @@ export function MyQr({ visitorAddress, campaign, onBack }: MyQrProps) {
         {!error && !signed && <p className="text-gray-500">Loading your code...</p>}
         {signed && (
           <div className="rounded-2xl bg-white p-4 shadow">
-            <QRCodeSVG value={JSON.stringify(signed.typed_data)} size={220} />
+            <QRCodeSVG
+              value={JSON.stringify({ typedData: signed.typed_data, attestation })}
+              size={220}
+            />
           </div>
         )}
       </div>

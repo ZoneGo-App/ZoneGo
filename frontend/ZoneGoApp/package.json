@@ -12,6 +12,7 @@
   "dependencies": {
     "@privy-io/react-auth": "^3.42.0",
     "@tailwindcss/vite": "^4.3.3",
+    "@worldcoin/idkit": "^4.2.3",
     "html5-qrcode": "^2.3.8",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8",

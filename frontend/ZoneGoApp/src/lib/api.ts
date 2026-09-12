@@ -49,6 +49,26 @@ export interface QrSignResponse {
   rotate_after_seconds: number
 }
 
+export interface WorldAttestation {
+  visitor: string
+  nullifier_hash: string
+  expiry: number
+  signature: string
+  typed_data: Record<string, unknown>
+}
+
+export interface WorldRpContextResponse {
+  app_id: string
+  action: string
+  rp_context: {
+    rp_id: string
+    nonce: string
+    created_at: number
+    expires_at: number
+    signature: string
+  }
+}
+
 export interface ClaimResponse {
   tx_hash: string
   status: string
@@ -108,10 +128,9 @@ export async function signQr(params: {
 }
 
 /**
- * Submits a claim to the relay. `attestation` is intentionally optional here:
- * the World identity-check screen isn't built yet, so today we always send
- * `null`. Expect the API to reject with a "missing attestation" error until
- * that screen exists — that error is the honest signal, not a bug.
+ * Submits a claim to the relay. `attestation` should be a real
+ * WorldAttestation from /world/verify once the identity-check screen has
+ * run, or null only as a temporary stand-in while that's still being wired up.
  */
 export async function claimVisit(params: {
   campaignId: number
@@ -120,7 +139,7 @@ export async function claimVisit(params: {
   geohash: string
   signature: string
   visitor: string
-  attestation: unknown | null
+  attestation: WorldAttestation | null
 }): Promise<ClaimResponse> {
   const url = new URL('/visits/claim', API_BASE_URL)
 
@@ -152,5 +171,40 @@ export async function fetchCampaigns(): Promise<Campaign[]> {
     throw new Error(`Fetching campaigns failed (status ${res.status})`)
   }
   return res.json()
+}
 
+export async function verifyWorld(params: {
+  visitor: string
+  proof: unknown
+}): Promise<WorldAttestation> {
+  const url = new URL('/world/verify', API_BASE_URL)
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      visitor: params.visitor,
+      proof: params.proof,
+    }),
+  })
+
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`World verification failed (status ${res.status}): ${body}`)
+  }
+  return res.json()
+}
+
+const WORLD_API_BASE_URL = 'https://zonego-api.onrender.com'
+
+/**
+ * Always hits Lucio's deployed API, not the local mock one — this endpoint
+ * doesn't depend on chain state, and it's the only place it exists today.
+ */
+export async function fetchWorldRpContext(): Promise<WorldRpContextResponse> {
+  const res = await fetch(new URL('/world/rp-context', WORLD_API_BASE_URL))
+  if (!res.ok) {
+    throw new Error(`Fetching World rp_context failed (status ${res.status})`)
+  }
+  return res.json()
 }

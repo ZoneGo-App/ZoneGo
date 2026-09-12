@@ -59,12 +59,19 @@ export function MerchantPanel({ merchantAddress, onGoToScan }: MerchantPanelProp
         <p className="text-sm text-gray-400">
           Campaign setup isn't built yet — check back soon.
         </p>
+        <p className="mt-4 rounded bg-yellow-100 px-3 py-1 text-xs text-yellow-800">
+          Dev only — your wallet: {merchantAddress}
+        </p>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen px-4 py-6">
+      <p className="mb-2 rounded bg-yellow-100 px-3 py-1 text-xs text-yellow-800">
+        Dev only — your wallet: {merchantAddress}
+      </p>
+
       <p className="text-xs uppercase text-gray-400">Business account</p>
       <h1 className="text-2xl font-bold">{campaign.merchant_name}</h1>
 

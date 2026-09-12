@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useSignTypedData } from '@privy-io/react-auth'
-import { claimVisit, type QrSignResponse } from '../lib/api'
+import { claimVisit, type QrSignResponse, type WorldAttestation } from '../lib/api'
 
 const SCANNER_ELEMENT_ID = 'scan-qr-reader'
 
@@ -14,7 +14,7 @@ const DEMO_ERRORS = [
 
 type Step =
   | { kind: 'scanning' }
-  | { kind: 'decoded'; typedData: QrSignResponse['typed_data'] }
+  | { kind: 'decoded'; typedData: QrSignResponse['typed_data']; attestation: WorldAttestation }
   | { kind: 'signing' }
   | { kind: 'submitting' }
   | { kind: 'success'; txHash: string }
@@ -44,8 +44,11 @@ export function ScanQr() {
         { fps: 10, qrbox: { width: 240, height: 240 } },
         (decodedText) => {
           try {
-            const typedData = JSON.parse(decodedText) as QrSignResponse['typed_data']
-            setStep({ kind: 'decoded', typedData })
+            const parsed = JSON.parse(decodedText) as {
+              typedData: QrSignResponse['typed_data']
+              attestation: WorldAttestation
+            }
+            setStep({ kind: 'decoded', typedData: parsed.typedData, attestation: parsed.attestation })
           } catch {
             setStep({ kind: 'error', message: 'That QR code is not a valid ZoneGo code.' })
           }
@@ -69,7 +72,10 @@ export function ScanQr() {
     }
   }, [step.kind])
 
-  async function handleSignAndConfirm(typedData: QrSignResponse['typed_data']) {
+  async function handleSignAndConfirm(
+    typedData: QrSignResponse['typed_data'],
+    attestation: WorldAttestation,
+  ) {
     setStep({ kind: 'signing' })
     try {
       const { signature } = await signTypedData({
@@ -88,7 +94,7 @@ export function ScanQr() {
         geohash: typedData.message.geohash,
         signature,
         visitor: typedData.message.visitor,
-        attestation: null, // TODO: wire real World attestation once identity check exists
+        attestation,
       })
 
       setStep({ kind: 'success', txHash: result.tx_hash })
@@ -123,7 +129,7 @@ export function ScanQr() {
         {step.kind === 'decoded' && (
           <button
             type="button"
-            onClick={() => handleSignAndConfirm(step.typedData)}
+            onClick={() => handleSignAndConfirm(step.typedData, step.attestation)}
             className="w-full rounded-lg bg-white py-3 font-medium text-black"
           >
             Sign &amp; confirm
@@ -165,8 +171,11 @@ export function ScanQr() {
                   placeholder="Paste the JSON from the neighbor's QR here"
                   onChange={(e) => {
                     try {
-                      const typedData = JSON.parse(e.target.value) as QrSignResponse['typed_data']
-                      setStep({ kind: 'decoded', typedData })
+                      const parsed = JSON.parse(e.target.value) as {
+                        typedData: QrSignResponse['typed_data']
+                        attestation: WorldAttestation
+                      }
+                      setStep({ kind: 'decoded', typedData: parsed.typedData, attestation: parsed.attestation })
                     } catch {
                       // Still typing/pasting — ignore until it's valid JSON.
                     }

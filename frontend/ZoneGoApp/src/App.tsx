@@ -6,7 +6,8 @@ import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
 import { ScanQr } from './screens/ScanQr'
 import { MerchantPanel } from './screens/MerchantPanel'
-import type { SearchHit } from './lib/api'
+import { IdentityCheck } from './screens/IdentityCheck'
+import type { SearchHit, WorldAttestation } from './lib/api'
 
 function RoleFallback() {
   const { setRole } = useRole()
@@ -36,6 +37,7 @@ function RoleFallback() {
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
+  const [attestation, setAttestation] = useState<WorldAttestation | null>(null)
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
   const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
 
@@ -69,21 +71,27 @@ function App() {
   }
 
   // Neighbor side.
+  const visitorAddress = user?.wallet?.address
+  if (!visitorAddress) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6 text-center">
+        <p className="text-red-600">
+          No wallet found for your account yet. Try signing out and back in.
+        </p>
+      </div>
+    )
+  }
+
+  if (!attestation) {
+    return <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
+  }
+
   if (selectedHit) {
-    const visitorAddress = user?.wallet?.address
-    if (!visitorAddress) {
-      return (
-        <div className="flex min-h-screen items-center justify-center px-6 text-center">
-          <p className="text-red-600">
-            No wallet found for your account yet. Try signing out and back in.
-          </p>
-        </div>
-      )
-    }
     return (
       <MyQr
         visitorAddress={visitorAddress}
         campaign={selectedHit.campaign}
+        attestation={attestation}
         onBack={() => setSelectedHit(null)}
       />
     )
