@@ -7,6 +7,7 @@ import { MyQr } from './screens/MyQr'
 import { ScanQr } from './screens/ScanQr'
 import { MerchantPanel } from './screens/MerchantPanel'
 import { IdentityCheck } from './screens/IdentityCheck'
+import { Leaderboard } from './screens/Leaderboard'
 import type { SearchHit, WorldAttestation } from './lib/api'
 
 function RoleFallback() {
@@ -40,6 +41,7 @@ function App() {
   const [attestation, setAttestation] = useState<WorldAttestation | null>(null)
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
   const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
 
   if (!ready) {
     return (
@@ -86,6 +88,21 @@ function App() {
     return <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
   }
 
+  if (showLeaderboard) {
+    return (
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowLeaderboard(false)}
+          className="px-4 pt-4 text-sm text-gray-600"
+        >
+          &larr; Back
+        </button>
+        <Leaderboard myAddress={visitorAddress} />
+      </div>
+    )
+  }
+
   if (selectedHit) {
     return (
       <MyQr
@@ -97,7 +114,20 @@ function App() {
     )
   }
 
-  return <Search onSelectCampaign={setSelectedHit} />
+  return (
+    <div>
+      <div className="flex justify-end px-4 pt-4">
+        <button
+          type="button"
+          onClick={() => setShowLeaderboard(true)}
+          className="text-sm text-gray-600 underline"
+        >
+          Rankings
+        </button>
+      </div>
+      <Search onSelectCampaign={setSelectedHit} />
+    </div>
+  )
 }
 
 export default App

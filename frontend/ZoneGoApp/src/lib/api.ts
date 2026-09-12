@@ -208,3 +208,61 @@ export async function fetchWorldRpContext(): Promise<WorldRpContextResponse> {
   }
   return res.json()
 }
+
+export interface LeaderboardEntry {
+  rank: number
+  address: string
+  label: string
+  visits: number
+  distinct_merchants: number
+  points: number
+  zone: string
+  zone_name: string
+  week_start: number | null
+}
+
+export interface PlayerStanding {
+  address: string
+  label: string
+  points: number
+  visits: number
+  distinct_merchants: number
+  rank: number
+  players: number
+  points_to_next: number | null
+  zone: string | null
+  zone_name: string | null
+  week_start: number | null
+}
+
+export async function fetchLeaderboard(params: {
+  scope: 'explorers' | 'merchants'
+  week?: number
+}): Promise<LeaderboardEntry[]> {
+  const url = new URL('/leaderboard', API_BASE_URL)
+  url.searchParams.set('scope', params.scope)
+  if (params.week !== undefined) {
+    url.searchParams.set('week', String(params.week))
+  }
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`Fetching leaderboard failed (status ${res.status})`)
+  }
+  return res.json()
+}
+
+export async function fetchMyStanding(params: {
+  address: string
+  week?: number
+}): Promise<PlayerStanding> {
+  const url = new URL('/leaderboard/me', API_BASE_URL)
+  url.searchParams.set('address', params.address)
+  if (params.week !== undefined) {
+    url.searchParams.set('week', String(params.week))
+  }
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`Fetching your standing failed (status ${res.status})`)
+  }
+  return res.json()
+}
