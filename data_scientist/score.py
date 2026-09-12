@@ -4,37 +4,14 @@ import sys
 import requests
 from fastapi import APIRouter, HTTPException
 
-# FIX: this used to be a try/except that imported from "infer" in BOTH
-# branches — a no-op fallback that silently defeated its own purpose (if
-# the first import ever failed, the except failed the exact same way).
-#
-# The deeper issue restoring "from ml.infer import ..." doesn't actually
-# fix: infer.py (and everything it imports — events.py, features.py,
-# graph_features.py) uses FLAT sibling imports ("from events import ...",
-# not "from .events import ..."). That only resolves if the ml/ directory
-# itself is on sys.path. Importing "ml" as a package from further up the
-# repo (`from ml.infer import ...`) gets past the first import fine, then
-# breaks one line into infer.py with "No module named 'events'" — tested
-# this directly, it reproduces every time. Converting every cross-import
-# inside ml/*.py to package-relative imports would fix it too, but touches
-# four files instead of one and changes how `python3 train.py` is run.
-#
-# This puts ml/ on sys.path first, THEN does the same flat import infer.py
-# itself uses — no changes needed to any file inside ml/.
-# ZONEGO_ML_DIR overrides the guess if ml/ lives somewhere else in your
-# real repo layout; otherwise a couple of common relative layouts are
-# tried automatically.
-_ML_DIR = os.environ.get("ZONEGO_ML_DIR")
-if not _ML_DIR:
-    _here = os.path.dirname(os.path.abspath(__file__))
-    for _candidate in ("../../ml", "../ml", "./ml", "."):
-        _resolved = os.path.normpath(os.path.join(_here, _candidate))
-        if os.path.isfile(os.path.join(_resolved, "infer.py")):
-            _ML_DIR = _resolved
-            break
-
-if _ML_DIR and _ML_DIR not in sys.path:
-    sys.path.insert(0, _ML_DIR)
+# Se agrega la carpeta donde vive ESTE archivo al sys.path -- así funciona
+# sin importar cómo se llame esa carpeta (no se asume "ml/" ni ningún otro
+# nombre): basta con que infer.py, events.py, features.py y
+# graph_features.py estén junto a score.py. ZONEGO_ML_DIR permite apuntar
+# a otro lado si en algún despliegue viven separados.
+_SIBLINGS_DIR = os.environ.get("ZONEGO_ML_DIR", os.path.dirname(os.path.abspath(__file__)))
+if _SIBLINGS_DIR not in sys.path:
+    sys.path.insert(0, _SIBLINGS_DIR)
 
 from infer import score_wallet, load_bundle, get_operating_threshold  # noqa: E402
 
@@ -90,6 +67,10 @@ def wallet_score(wallet: str) -> float:
         raise HTTPException(status_code=502, detail=f"Subgraph query failed: {exc}")
 
     if score is None:
+        # Ahora mismo esto va a pasar para prácticamente cualquier wallet:
+        # el subgraph desplegado todavía no tiene ni una visita indexada
+        # (bloqueado en que Sebas redespliegue los contratos, no en este
+        # código). Mientras tanto, validar contra data/visits.csv.
         raise HTTPException(status_code=404, detail=f"No indexed visits found for {wallet}")
 
     # TODO(Lucio / whoever owns the payment tree): this is where `score`
@@ -113,6 +94,5 @@ def wallet_score_threshold(point: str = "high_recall_point") -> float:
         return get_operating_threshold(bundle=bundle, point=point)
     except (FileNotFoundError, KeyError) as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-
 
 
