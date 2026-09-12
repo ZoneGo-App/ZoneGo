@@ -68,27 +68,27 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
   }, [signed])
 
   return (
-    <div className="min-h-screen px-4 py-6">
-      <button type="button" onClick={onBack} className="mb-4 text-sm text-gray-600">
+    <div className="min-h-screen bg-bg px-4 py-6">
+      <button type="button" onClick={onBack} className="mb-4 text-sm text-ink-muted">
         &larr; Back
       </button>
 
       <div className="text-center">
-        <h1 className="text-lg font-semibold">{campaign.merchant_name}</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-lg font-semibold text-ink">{campaign.merchant_name}</h1>
+        <p className="text-sm text-ink-muted">
           {formatUsd(campaign.reward_today)} per visit
         </p>
       </div>
 
-      <p className="mt-6 text-center text-gray-600">
+      <p className="mt-6 text-center text-ink-muted">
         Show this to the store so you can get paid
       </p>
 
       <div className="mt-4 flex justify-center">
         {error && <p className="text-red-600">{error}</p>}
-        {!error && !signed && <p className="text-gray-500">Loading your code...</p>}
+        {!error && !signed && <p className="text-ink-muted">Loading your code...</p>}
         {signed && (
-          <div className="rounded-2xl bg-white p-4 shadow">
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <QRCodeSVG
               value={JSON.stringify({ typedData: signed.typed_data, attestation })}
               size={220}
@@ -100,20 +100,18 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
       {signed && (
         <>
           <div className="mt-6 flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-black text-lg font-semibold">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-brand text-lg font-semibold text-brand">
               {secondsLeft}
             </div>
           </div>
-          <p className="mt-2 text-center text-sm text-gray-500">
+          <p className="mt-2 text-center text-sm text-ink-muted">
             Refreshes every {signed.rotate_after_seconds} seconds
           </p>
 
-          <div className="mt-6 rounded-xl bg-gray-100 p-4 text-center">
-            <p className="text-xs uppercase text-gray-500">You earn</p>
-            <p className="text-2xl font-bold text-black">
-              {formatUsd(campaign.reward_today)}
-            </p>
-            <p className="text-xs text-gray-500">instantly &middot; verified in real time</p>
+          <div className="mt-6 rounded-2xl bg-brand-dark p-4 text-center text-white">
+            <p className="text-xs uppercase tracking-wide text-white/70">You earn</p>
+            <p className="text-2xl font-bold">{formatUsd(campaign.reward_today)}</p>
+            <p className="text-xs text-white/70">instantly &middot; verified in real time</p>
           </div>
         </>
       )}

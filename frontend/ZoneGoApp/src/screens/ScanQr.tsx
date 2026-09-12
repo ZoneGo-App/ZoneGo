@@ -130,7 +130,7 @@ export function ScanQr() {
           <button
             type="button"
             onClick={() => handleSignAndConfirm(step.typedData, step.attestation)}
-            className="w-full rounded-lg bg-white py-3 font-medium text-black"
+            className="w-full rounded-full bg-brand py-3 font-medium text-white"
           >
             Sign &amp; confirm
           </button>

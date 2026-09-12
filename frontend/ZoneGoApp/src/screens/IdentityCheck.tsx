@@ -83,7 +83,7 @@ function SelfieCheckWidget({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 rounded-lg bg-black px-6 py-3 font-medium text-white"
+          className="mt-2 rounded-full bg-brand px-6 py-3 font-medium text-white"
         >
           Try again
         </button>
@@ -94,20 +94,20 @@ function SelfieCheckWidget({
   return (
     <>
       {flow.isAwaitingUserConnection && flow.connectorURI && (
-        <div className="rounded-2xl bg-white p-4 shadow">
+        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
           <QRCodeSVG value={flow.connectorURI} size={220} />
-          <p className="mt-2 text-center text-xs text-gray-500">
+          <p className="mt-2 text-center text-xs text-ink-muted">
             Scan with the World App on your phone
           </p>
         </div>
       )}
 
       {flow.isAwaitingUserConfirmation && (
-        <p className="text-sm text-gray-500">Confirm the selfie check in the World App...</p>
+        <p className="text-sm text-ink-muted">Confirm the selfie check in the World App...</p>
       )}
 
       {flow.isSuccess && !backendError && (
-        <p className="text-sm text-gray-500">Confirming with our server...</p>
+        <p className="text-sm text-ink-muted">Confirming with our server...</p>
       )}
       {backendError && <p className="text-sm text-red-600">{backendError}</p>}
 
@@ -116,7 +116,7 @@ function SelfieCheckWidget({
           type="button"
           onClick={flow.open}
           disabled={isBusy}
-          className="rounded-lg bg-black px-6 py-3 font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-brand px-6 py-3 font-medium text-white disabled:opacity-50"
         >
           {isBusy ? 'Waiting for World App...' : 'Take Selfie'}
         </button>
@@ -125,7 +125,7 @@ function SelfieCheckWidget({
           type="button"
           onClick={handleWorldSuccess}
           disabled={submitting}
-          className="rounded-lg bg-black px-6 py-3 font-medium text-white disabled:opacity-50"
+          className="rounded-full bg-brand px-6 py-3 font-medium text-white disabled:opacity-50"
         >
           {submitting ? 'Confirming...' : 'Continue'}
         </button>
@@ -160,10 +160,10 @@ export function IdentityCheck({ visitorAddress, onVerified }: IdentityCheckProps
   }, [attempt])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-bg px-6 text-center">
       <div>
-        <h1 className="text-xl font-bold">Identity check</h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <h1 className="text-xl font-bold text-ink">Identity check</h1>
+        <p className="mt-2 text-sm text-ink-muted">
           One quick selfie to confirm you're a real person. Takes about 30 seconds.
         </p>
       </div>
@@ -174,7 +174,7 @@ export function IdentityCheck({ visitorAddress, onVerified }: IdentityCheckProps
           <button
             type="button"
             onClick={() => setAttempt((a) => a + 1)}
-            className="mt-2 text-sm text-gray-500 underline"
+            className="mt-2 text-sm text-ink-muted underline"
           >
             Try again
           </button>
@@ -196,7 +196,7 @@ export function IdentityCheck({ visitorAddress, onVerified }: IdentityCheckProps
           <button
             type="button"
             onClick={() => onVerified(buildFakeAttestation(visitorAddress))}
-            className="rounded-lg border border-gray-300 px-6 py-3 text-sm text-gray-700"
+            className="rounded-full border border-border px-6 py-3 text-sm text-ink-muted"
           >
             Dev only: skip with a fake attestation
           </button>

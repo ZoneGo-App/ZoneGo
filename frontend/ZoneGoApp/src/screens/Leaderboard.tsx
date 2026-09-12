@@ -12,6 +12,13 @@ function currentWeekTimestamp(): number {
   return Math.floor(Date.now() / 1000)
 }
 
+function rankBadgeClasses(rank: number): string {
+  if (rank === 1) return 'bg-accent text-white'
+  if (rank === 2) return 'bg-ink-muted/30 text-ink'
+  if (rank === 3) return 'bg-brand/20 text-brand-dark'
+  return 'text-ink-muted'
+}
+
 interface LeaderboardProps {
   myAddress: string
 }
@@ -61,17 +68,17 @@ export function Leaderboard({ myAddress }: LeaderboardProps) {
   }, [scope, myAddress])
 
   return (
-    <div className="min-h-screen px-4 py-6">
-      <h1 className="text-lg font-bold">Zone Rankings</h1>
+    <div className="min-h-screen bg-bg px-4 py-6">
+      <h1 className="text-lg font-bold text-ink">Zone Rankings</h1>
 
-      <div className="mt-3 flex gap-2 border-b border-gray-200">
+      <div className="mt-3 flex gap-2 border-b border-border">
         <button
           type="button"
           onClick={() => setScope('explorers')}
-          className={`px-3 py-2 text-sm font-medium ${
+          className={`px-3 py-2 text-sm font-medium transition ${
             scope === 'explorers'
-              ? 'border-b-2 border-black text-black'
-              : 'text-gray-400'
+              ? 'border-b-2 border-brand text-brand'
+              : 'text-ink-muted'
           }`}
         >
           Explorers
@@ -79,19 +86,19 @@ export function Leaderboard({ myAddress }: LeaderboardProps) {
         <button
           type="button"
           onClick={() => setScope('merchants')}
-          className={`px-3 py-2 text-sm font-medium ${
+          className={`px-3 py-2 text-sm font-medium transition ${
             scope === 'merchants'
-              ? 'border-b-2 border-black text-black'
-              : 'text-gray-400'
+              ? 'border-b-2 border-brand text-brand'
+              : 'text-ink-muted'
           }`}
         >
           Most visited stores
         </button>
       </div>
 
-      <p className="mt-3 text-xs text-gray-400">This week's ranking · resets every Monday</p>
+      <p className="mt-3 text-xs text-ink-muted">This week's ranking · resets every Monday</p>
 
-      {loading && <p className="mt-6 text-center text-gray-500">Loading...</p>}
+      {loading && <p className="mt-6 text-center text-ink-muted">Loading...</p>}
       {error && <p className="mt-6 text-center text-red-600">{error}</p>}
 
       {!loading && !error && (
@@ -99,39 +106,43 @@ export function Leaderboard({ myAddress }: LeaderboardProps) {
           {entries.map((entry) => (
             <li
               key={entry.address}
-              className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3"
+              className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3"
             >
               <div className="flex items-center gap-3">
-                <span className="w-5 text-sm font-semibold text-gray-500">#{entry.rank}</span>
-                <span className="font-medium">{entry.label}</span>
+                <span
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${rankBadgeClasses(entry.rank)}`}
+                >
+                  {entry.rank}
+                </span>
+                <span className="font-medium text-ink">{entry.label}</span>
               </div>
               <div className="text-right">
                 {scope === 'explorers' ? (
                   <>
-                    <p className="font-semibold">{entry.points} pts</p>
-                    <p className="text-xs text-gray-400">{entry.distinct_merchants} new stores</p>
+                    <p className="font-semibold text-ink">{entry.points} pts</p>
+                    <p className="text-xs text-ink-muted">{entry.distinct_merchants} new stores</p>
                   </>
                 ) : (
-                  <p className="font-semibold">{entry.visits} visits</p>
+                  <p className="font-semibold text-ink">{entry.visits} visits</p>
                 )}
               </div>
             </li>
           ))}
           {entries.length === 0 && (
-            <p className="mt-6 text-center text-gray-500">Nobody here yet this week.</p>
+            <p className="mt-6 text-center text-ink-muted">Nobody here yet this week.</p>
           )}
         </ul>
       )}
 
       {scope === 'explorers' && standing && (
-        <div className="mt-6 rounded-xl bg-black p-4 text-white">
-          <p className="text-xs uppercase text-gray-300">You · this week</p>
+        <div className="mt-6 rounded-2xl bg-brand-dark p-4 text-white">
+          <p className="text-xs uppercase tracking-wide text-white/70">You · this week</p>
           <p className="mt-1 text-2xl font-bold">
             {standing.points} pts <span className="text-sm font-normal">#{standing.rank}</span>
           </p>
-          <p className="text-xs text-gray-300">{standing.distinct_merchants} new stores</p>
+          <p className="text-xs text-white/70">{standing.distinct_merchants} new stores</p>
           {standing.points_to_next !== null && (
-            <p className="mt-2 text-xs text-gray-300">
+            <p className="mt-2 text-xs text-white/70">
               {standing.points_to_next} pts more to pass the person above you
             </p>
           )}

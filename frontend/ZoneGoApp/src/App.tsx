@@ -13,20 +13,20 @@ import type { SearchHit, WorldAttestation } from './lib/api'
 function RoleFallback() {
   const { setRole } = useRole()
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="text-gray-600">We couldn't remember your role. How are you signing in?</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg px-6 text-center">
+      <p className="text-ink-muted">We couldn't remember your role. How are you signing in?</p>
       <div className="flex gap-3">
         <button
           type="button"
           onClick={() => setRole('comercio')}
-          className="rounded-lg bg-black px-6 py-3 font-medium text-white"
+          className="rounded-full bg-brand px-6 py-3 font-medium text-white"
         >
           I'm a merchant
         </button>
         <button
           type="button"
           onClick={() => setRole('vecino')}
-          className="rounded-lg border border-gray-300 px-6 py-3 font-medium text-gray-900"
+          className="rounded-full border border-border px-6 py-3 font-medium text-ink"
         >
           I'm a neighbor
         </button>
@@ -45,11 +45,11 @@ function LogoutBar() {
   }
 
   return (
-    <div className="flex justify-end px-4 pt-4">
+    <div className="flex justify-end bg-bg px-4 pt-4">
       <button
         type="button"
         onClick={handleLogout}
-        className="text-sm text-gray-500 underline"
+        className="text-sm text-ink-muted underline"
       >
         Log out
       </button>
@@ -67,8 +67,8 @@ function App() {
 
   if (!ready) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+      <div className="flex min-h-screen items-center justify-center bg-bg">
+        <p className="text-ink-muted">Loading...</p>
       </div>
     )
   }
@@ -97,7 +97,7 @@ function App() {
     const visitorAddress = user?.wallet?.address
     if (!visitorAddress) {
       content = (
-        <div className="flex min-h-screen items-center justify-center px-6 text-center">
+        <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-center">
           <p className="text-red-600">
             No wallet found for your account yet. Try signing out and back in.
           </p>
@@ -107,11 +107,11 @@ function App() {
       content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
     } else if (showLeaderboard) {
       content = (
-        <div>
+        <div className="bg-bg">
           <button
             type="button"
             onClick={() => setShowLeaderboard(false)}
-            className="px-4 pt-4 text-sm text-gray-600"
+            className="px-4 pt-4 text-sm text-ink-muted"
           >
             &larr; Back
           </button>
@@ -129,12 +129,12 @@ function App() {
       )
     } else {
       content = (
-        <div>
+        <div className="bg-bg">
           <div className="flex justify-end px-4 pt-4">
             <button
               type="button"
               onClick={() => setShowLeaderboard(true)}
-              className="text-sm text-gray-600 underline"
+              className="text-sm text-brand underline"
             >
               Rankings
             </button>
