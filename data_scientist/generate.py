@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import secrets
 from itertools import combinations
 
-OUTPUT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "visits.csv")
+OUTPUT_PATH = os.environ.get("ZONEGO_DATA_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "visits.csv"))
 
 BUSINESS_TYPES = [
     "bodega", "deli", "laundromat", "barbershop",
