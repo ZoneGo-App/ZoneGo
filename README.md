@@ -336,7 +336,7 @@ addresses anybody can read, not a promise in a README.
 **Subgraph**, live on Subgraph Studio:
 
 ```
-https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.1
+https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
 ```
 
 Everything the product shows about the past is read from that URL. Run the same

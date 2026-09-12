@@ -13,7 +13,7 @@ from web3 import Web3
 from api import relay
 from api.config import get_config
 
-REGISTRY = "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
+REGISTRY = "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
 # Test key, never funded, never used anywhere but here.
 RELAY_KEY = "0x" + "11" * 32
 TX_HASH = "0x" + "ab" * 32

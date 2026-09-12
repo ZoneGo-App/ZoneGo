@@ -24,7 +24,7 @@ services:
       - key: RPC_URL
         value: https://sepolia.base.org
       - key: SUBGRAPH_URL
-        value: https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.1
+        value: https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
       - key: CAMPAIGN_VAULT_ADDRESS
         value: "0x7b4aaDDe248818bAD121431eAd1a3A865914c419"
       - key: VISIT_REGISTRY_ADDRESS

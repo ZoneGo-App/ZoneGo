@@ -29,7 +29,7 @@ ATTESTER = Account.from_key(ATTESTER_KEY).address
 VISITOR = "0x7A3c9E1b4D2f5A8c6B0e9F7d3C1a5B8e2D4f6A90"
 OTHER = "0x4E8b2C7a1F9d6B3e5A0c8D2f7B4a1E6c9D3f5B70"
 NULLIFIER = "0x" + "ab" * 32
-REGISTRY = "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
+REGISTRY = "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
 
 A_PROOF = {"protocol_version": "4.0", "action": "verify-visitor", "responses": []}
 
