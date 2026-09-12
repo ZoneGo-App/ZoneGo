@@ -13,6 +13,10 @@ interface IdentityCheckProps {
   onVerified: (attestation: WorldAttestation) => void
 }
 
+function isMobileDevice(): boolean {
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent)
+}
+
 function randomHex(byteLength: number): string {
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength))
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
@@ -94,12 +98,21 @@ function SelfieCheckWidget({
   return (
     <>
       {flow.isAwaitingUserConnection && flow.connectorURI && (
-        <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-          <QRCodeSVG value={flow.connectorURI} size={220} />
-          <p className="mt-2 text-center text-xs text-ink-muted">
-            Scan with the World App on your phone
-          </p>
-        </div>
+        isMobileDevice() ? (
+          
+            href={flow.connectorURI}
+            className="block w-full rounded-full bg-brand px-6 py-3 text-center font-medium text-white"
+          >
+            Open World App
+          </a>
+        ) : (
+          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+            <QRCodeSVG value={flow.connectorURI} size={220} />
+            <p className="mt-2 text-center text-xs text-ink-muted">
+              Scan with the World App on your phone
+            </p>
+          </div>
+        )
       )}
 
       {flow.isAwaitingUserConfirmation && (

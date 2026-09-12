@@ -10,6 +10,29 @@ import { IdentityCheck } from './screens/IdentityCheck'
 import { Leaderboard } from './screens/Leaderboard'
 import type { SearchHit, WorldAttestation } from './lib/api'
 
+const ATTESTATION_STORAGE_KEY = 'zonego_attestation'
+
+/**
+ * Reads a previously stored attestation, but only if it hasn't expired.
+ * The attestation itself carries a short TTL (120s, set server-side) — an
+ * expired one sitting in storage would just fail on chain, so there is no
+ * point handing it back to the UI as if it were still usable.
+ */
+function readStoredAttestation(): WorldAttestation | null {
+  const raw = sessionStorage.getItem(ATTESTATION_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as WorldAttestation
+    if (parsed.expiry <= Math.floor(Date.now() / 1000)) {
+      sessionStorage.removeItem(ATTESTATION_STORAGE_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
 function RoleFallback() {
   const { setRole } = useRole()
   return (
@@ -41,6 +64,7 @@ function LogoutBar() {
 
   async function handleLogout() {
     setRole(null)
+    sessionStorage.removeItem(ATTESTATION_STORAGE_KEY)
     await logout()
   }
 
@@ -60,10 +84,17 @@ function LogoutBar() {
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
-  const [attestation, setAttestation] = useState<WorldAttestation | null>(null)
+  const [attestation, setAttestationState] = useState<WorldAttestation | null>(
+    readStoredAttestation,
+  )
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
   const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+
+  function setAttestation(next: WorldAttestation) {
+    sessionStorage.setItem(ATTESTATION_STORAGE_KEY, JSON.stringify(next))
+    setAttestationState(next)
+  }
 
   if (!ready) {
     return (
