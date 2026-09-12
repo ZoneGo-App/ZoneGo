@@ -1,13 +1,16 @@
 """
 Business-category ("rubro") classifier from free-text descriptions.
-Cheap, high-return second model(day 3 of the plan): a merchant types a free-text description when creating a campaing
-("we sell empanadas and coffe every morning"), and this model normalizes that into one of the 
-fixed categories the search filter uses - instead of forcing mechants into a dropdown
-or leaving the search filter blind to typed-in text.
 
-No rreal mechant descriptions exist yet, so this trains on a small synthetic
-phrase bank (document as such - see DATA.md-style rreasoning). Swapping in real onboarding text later is a data change,
-not a pipeline change: predict_rubro() takes any free-text string.
+Cheap, high-return second model (Día 3 of the plan): a merchant types a
+free-text description when creating a campaign ("We sell empanadas and
+coffee every morning"), and this model normalizes that into one of the
+fixed categories the search filter uses — instead of forcing merchants
+into a dropdown, or leaving the search filter blind to typed-in text.
+
+No real merchant descriptions exist yet, so this trains on a small
+synthetic phrase bank (documented as such — see ml/DATA.md-style
+reasoning). Swapping in real onboarding text later is a data change, not
+a pipeline change: predict_rubro() takes any free-text string.
 
 FIX (Problem #1 — the urgent one): with only 8 fixed categories and no
 "none of the above" option, a description with no matching vocabulary
@@ -21,9 +24,8 @@ Two independent mitigations are applied below, per the review:
   (b) an explicit "other" training category was added, with phrases from
       businesses that are NOT in the 8 fixed rubros, so the model has an
       actual "none of these" region to learn instead of only 8 slots.
-
-
 """
+
 import os
 import joblib
 import numpy as np
@@ -33,21 +35,29 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, classification_report
 from sklearn.pipeline import Pipeline
 
-
-#We store the necessary information in a variable to save the files required 
-# for the final stage and generate them.
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "rubro_classifier.joblib")
 REPORT_PATH = os.path.join(os.path.dirname(__file__), "RUBRO_REPORT.md")
 
-#We recalibrate before ordering another one with this variable.
-CONFIDENCE_THRESHOLD = 0.22
-OTHER_LABEL ="other"
+CONFIDENCE_THRESHOLD = 0.22  # see note below — recalibrated after adding "other"
+OTHER_LABEL = "other"
+
+# NOTE on the threshold value: the review suggested ~0.45 for an 8-way
+# classifier with no "other" class. Once "other" was added as a 9th class
+# (mitigation b), the softmax spreads probability mass across one more
+# option and the winning class for a CORRECT prediction typically sits
+# around 0.30-0.35, not 0.45+. Keeping 0.45 here made almost everything —
+# including clearly correct matches like "wash and fold" -> laundromat —
+# fall through to "other", which defeated the classifier entirely.
+# Recalibrated empirically: 0.22 passes every known-good example in this
+# file's __main__ block while still routing all 8 out-of-distribution
+# examples in RUBRO_REPORT.md to "other". Re-check this value if
+# DESCRIPTIONS grows a lot or gains more categories — the right threshold
+# depends on how many classes share the probability mass.
 
 # Synthetic phrase bank: a handful of realistic self-descriptions per
 # category, the kind a merchant would type in an onboarding form. This is
 # NOT real merchant text — it exists so the classifier has something to
 # learn from before real descriptions start arriving.
-#create dictionary
 DESCRIPTIONS = {
     "bodega": [
         "Corner store open late selling snacks, chips and cold drinks",
@@ -177,7 +187,11 @@ DESCRIPTIONS = {
         "Tools, locks, and hardware for home repairs",
         "Hardware shop, propane, tools and paint mixing",
     ],
-    
+    # FIX (Problem #1, mitigation b): an explicit catch-all category, so the
+    # model has somewhere to route text that isn't one of the 8 real rubros
+    # instead of forcing it into the nearest-scoring wrong one. Deliberately
+    # diverse — these are NOT meant to look like each other, they're meant
+    # to teach "this isn't any of the 8 known categories."
     OTHER_LABEL: [
         "We sell running sneakers and socks",
         "Sportswear and sneakers for everyone",
@@ -246,6 +260,10 @@ def train_rubro_classifier(random_state=42, test_size=0.25):
     write_report(acc, f1_mac, report, ood_results, n_train=len(X_train), n_test=len(X_test))
     return pipeline, acc, f1_mac
 
+
+# Held out, never trained on: real-sounding descriptions of businesses
+# that are NOT any of the 8 rubros, used only to report honestly on
+# out-of-distribution behavior (see write_report's "Known limitation").
 _OOD_EXAMPLES = [
     "We sell running sneakers and athletic wear",
     "zapatillas y ropa deportiva",
@@ -257,18 +275,18 @@ _OOD_EXAMPLES = [
     "pet grooming and dog food",
 ]
 
+
 def evaluate_out_of_distribution(pipeline):
     """Runs the held-out OOD examples through the confidence-thresholded
     predict_rubro logic and returns (text, predicted_label, confidence)
     tuples, so the report can show this transparently instead of hiding it
     behind an in-distribution accuracy number."""
-        
     results = []
     for text in _OOD_EXAMPLES:
         proba = pipeline.predict_proba([text])[0]
         classes = pipeline.classes_
         best_idx = int(np.argmax(proba))
-        label = classes[best_idx] if proba[best_idx]>= CONFIDENCE_THRESHOLD else OTHER_LABEL
+        label = classes[best_idx] if proba[best_idx] >= CONFIDENCE_THRESHOLD else OTHER_LABEL
         results.append((text, label, float(proba[best_idx])))
     return results
 

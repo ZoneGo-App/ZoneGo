@@ -82,7 +82,7 @@ if __name__ == "__main__":
     if score is None:
         print(f"No indexed visits found for {wallet_arg}")
     else:
-        print(f"fraud_score for {wallet_arg}: {score:.4f}")from __future__ import annotations
+        print(f"fraud_score for {wallet_arg}: {score:.4f}")
 
 import os
 import sys
