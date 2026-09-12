@@ -33,13 +33,14 @@ FEATURES_V1 = ['previous_time', 'implied_velocity', 'hour_deviation', 'covisit_d
 # is the explicit interaction between it and covisit_partners, computed below.
 FEATURES_ALL = FEATURES_V1 + GRAPH_FEATURES + ['wallet_farm_signal']
 
-def add_sequential_features(df: pd.DataFrame)-> pd.DataFrame:
+
+def add_sequential_features(df: pd.DataFrame) -> pd.DataFrame:
     """previous_time / implied_velocity: depend only on each entity's own
     past (grouped by nullifier / wallet respectively), never on a
     dataset-wide aggregate. Safe to compute on ANY dataframe -- train,
     test, or a live batch of events at inference time -- without a fitted
-    reference from anywhere else."""
-
+    reference from anywhere else.
+    """
     df = df.copy()
     df['hour'] = df['timestamp'].dt.hour
     df['hour_window'] = df['timestamp'].dt.floor('h')
@@ -47,10 +48,13 @@ def add_sequential_features(df: pd.DataFrame)-> pd.DataFrame:
 
     by_nullifier = df.sort_values(by=['nullifier', 'timestamp'])
     previous_time = (
-        by_nullifier.groupby('nullifier')['timestamp'].diff().dt.total_seconds().fillna(999999)
+        by_nullifier.groupby('nullifier')['timestamp']
+        .diff().dt.total_seconds().fillna(999999)
     )
     df['previous_time'] = previous_time.reindex(df.index)
+
     by_wallet = df.sort_values(by=['wallet', 'timestamp'])
+
     lat_prev = by_wallet.groupby('wallet')['lat'].shift(1)
     lon_prev = by_wallet.groupby('wallet')['lon'].shift(1)
     time_prev = by_wallet.groupby('wallet')['timestamp'].shift(1)
@@ -68,6 +72,7 @@ def add_sequential_features(df: pd.DataFrame)-> pd.DataFrame:
     implied_velocity = pd.concat([velocity_prev, velocity_next], axis=1).max(axis=1).fillna(0)
     df['implied_velocity'] = implied_velocity.reindex(df.index)
     return df
+
 
 def fit_aggregated_features(train_df: pd.DataFrame) -> dict:
     """Fits every aggregate that must be computed ONLY on training data:
@@ -97,6 +102,7 @@ def fit_aggregated_features(train_df: pd.DataFrame) -> dict:
         'covisits_train': covisits_train,
         'graph_reference': graph_reference,
     }
+
 
 def apply_aggregated_features(df: pd.DataFrame, fitted: dict) -> pd.DataFrame:
     """Applies a previously-fitted bundle (from fit_aggregated_features) to
@@ -153,3 +159,4 @@ def apply_aggregated_features(df: pd.DataFrame, fitted: dict) -> pd.DataFrame:
     df['wallet_farm_signal'] = df['sybil_score'] * (1 + df['covisit_partners'])
 
     return df
+
