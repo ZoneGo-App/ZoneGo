@@ -11,6 +11,10 @@
   },
   "dependencies": {
     "@privy-io/react-auth": "^3.42.0",
+    "@solana-program/memo": "^0.13.1",
+    "@solana-program/system": "^0.14.1",
+    "@solana-program/token": "^0.16.1",
+    "@solana/kit": "^8.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@worldcoin/idkit": "^4.2.3",
     "html5-qrcode": "^2.3.8",
