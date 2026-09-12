@@ -79,13 +79,13 @@ export function Search({ onSelectCampaign }: SearchProps) {
   }, [coords, radiusKm, debouncedQuery])
 
   return (
-    <div className="min-h-screen px-4 py-6">
+    <div className="min-h-screen bg-bg px-4 py-6">
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder='Search for something, e.g. "sneakers"'
-        className="w-full rounded-lg border border-gray-300 px-4 py-3 text-base"
+        className="w-full rounded-2xl border border-border bg-surface px-4 py-3 text-base text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none"
       />
 
       <div className="mt-3 flex gap-2">
@@ -94,10 +94,10 @@ export function Search({ onSelectCampaign }: SearchProps) {
             key={km}
             type="button"
             onClick={() => setRadiusKm(km)}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium ${
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
               radiusKm === km
-                ? 'bg-black text-white'
-                : 'border border-gray-300 text-gray-700'
+                ? 'bg-brand text-white'
+                : 'border border-border text-ink-muted'
             }`}
           >
             {km} km
@@ -106,13 +106,13 @@ export function Search({ onSelectCampaign }: SearchProps) {
       </div>
 
       {!coords && !error && (
-        <p className="mt-6 text-center text-gray-500">Finding you...</p>
+        <p className="mt-6 text-center text-ink-muted">Finding you...</p>
       )}
       {error && <p className="mt-6 text-center text-red-600">{error}</p>}
-      {loading && <p className="mt-6 text-center text-gray-500">Searching...</p>}
+      {loading && <p className="mt-6 text-center text-ink-muted">Searching...</p>}
 
       {!loading && coords && results.length === 0 && !error && (
-        <p className="mt-6 text-center text-gray-500">
+        <p className="mt-6 text-center text-ink-muted">
           Nothing nearby — try a bigger radius.
         </p>
       )}
@@ -123,18 +123,18 @@ export function Search({ onSelectCampaign }: SearchProps) {
             <button
               type="button"
               onClick={() => onSelectCampaign(hit)}
-              className="flex w-full items-center justify-between rounded-lg border border-gray-200 px-4 py-3 text-left"
+              className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-left transition hover:border-brand"
             >
               <div>
-                <p className="font-medium">{hit.campaign.merchant_name}</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-semibold text-ink">{hit.campaign.merchant_name}</p>
+                <p className="text-sm text-ink-muted">
                   {formatDistance(hit.distance_meters)}
                   {hit.campaign.pays_double_today && (
-                    <span className="ml-2 text-orange-600">pays more today</span>
+                    <span className="ml-2 font-medium text-accent">pays more today</span>
                   )}
                 </p>
               </div>
-              <p className="text-lg font-semibold">
+              <p className="text-lg font-semibold text-ink">
                 {formatUsd(hit.campaign.reward_today)}
               </p>
             </button>
