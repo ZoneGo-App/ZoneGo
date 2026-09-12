@@ -99,10 +99,10 @@ class Config(BaseSettings):
     # process, so whoever reads either reads both, and the blast radii people
     # imagine for separate keys are not separate here.
     #
-    # What sharing does cost is the nonce. The relay and this job ask the node
-    # for the same next number, so two sends in the same second lose one of
-    # them. At one publication an hour the window is narrow enough to accept —
-    # and the day it is not, this is a value to change and not code to write.
+    # What sharing used to cost was the nonce: the relay and this job read the
+    # same next number and one send was lost. Both go through `api/sending.py`
+    # now, which counts the mempool and spends one nonce at a time per address,
+    # so a separate key is a value to change here and not code to write.
     #
     # The address is empty until the oracle is redeployed. The job runs the
     # whole path either way and logs which half is missing.

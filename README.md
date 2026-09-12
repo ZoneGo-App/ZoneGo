@@ -301,11 +301,11 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 16 endpoints, **231 tests** | Deployed and public |
+| API — 17 endpoints, **263 tests** | **Live** at `zonego-api.onrender.com` |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
-| Contracts — vault, registry, oracle | Deployed on Base Sepolia; World and the oracle in progress |
+| World ID 4.0 | Request signing live and pinned to World's own vectors; the end-to-end flow waits on the frontend |
+| Contracts — vault, registry, oracle | Written and tested; the versions on chain predate them, so a redeploy is pending |
 | Fraud model | Trains; live inference against the subgraph in progress |
-| Public deployment | In progress |
 
 ### Deployed
 
@@ -316,6 +316,12 @@ CampaignVault    0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0
 VisitRegistry    0xD33f2e26f11Fe011835D791EbA1BFE123479998A
 FraudOracle      0x5157504d3a9683Ca953EF5db1255dE619E110A9B
 ```
+
+These three are the first deployment, and the contracts have moved since: the
+registry on chain still takes the older `claim`, and the oracle there is the
+skeleton whose `commitEpoch` reverts. The addresses are replaced here the day
+they are redeployed — printed rather than quietly left stale, because anybody
+can read the bytecode and see which version answers.
 
 **Subgraph**, live on Subgraph Studio:
 
@@ -344,14 +350,17 @@ literature each pattern comes from, and how real data swaps in without
 changing the pipeline. A weakness you name first stops being an attack and
 becomes rigour.
 
-**Also known, and the next thing we would fix:** the key that publishes epoch
-roots is the same one that relays claims. It has its own setting, so splitting
-it is a value to change rather than code to write — but the two would still sit
-in one environment read by one process, which is why we did not spend the day on
-it. The reason to split them is not secrecy, it is the nonce: both ask the node
-for the same next number, so two sends in the same second lose one. At one
-publication an hour that is rare. At a hundred merchants it would not be, and
-that is the point at which this stops being a footnote.
+**Also known, and the next thing we would fix:** three things the API keeps in
+one process rather than in a shared store — the rate-limit counters, the
+in-memory note of which wallet a World nullifier was first attested for, and the
+epoch the hourly job last published. A second replica would keep its own copy of
+each, so the rate limit would double and a nullifier could be attested twice.
+
+None of the three is the last line of defence, which is why a hackathon week
+does not stand up Redis for them: the contract binds a nullifier to one wallet
+and refuses a second, and it refuses an epoch that is not greater than the one
+already committed. The process-local copies save a call, and the chain is what
+actually decides. At more than one replica that stops being a footnote.
 
 ---
 
