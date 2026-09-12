@@ -17,6 +17,7 @@ def data_generate(n_businesses=50, n_neighbors=500, n_visits=20000, seed=42):
     np.random.seed(seed)
 
     # 1. BUSINESSES — Lower East Side / East Village, Manhattan.
+    # Sigma of 0.008 deg (~900 m) instead of Lima's 0.015: a Manhattan
     # neighborhood is denser, and 900 m is the real scale of walking to shop.
     lat_center, lon_center = 40.7220, -73.9870
     businesses = pd.DataFrame({
@@ -44,11 +45,13 @@ def data_generate(n_businesses=50, n_neighbors=500, n_visits=20000, seed=42):
     # 2. NEIGHBORS (Wallets) — ONE STABLE NULLIFIER PER WALLET.
     # This is what World ID actually guarantees in the real system: a human
     # keeps the same nullifier across visits. A random nullifier per visit
+    # (the previous version) made `previous_time` a dead, near-constant
     # feature, because almost no two rows ever shared a nullifier.
     wallet_list = [f"0x{secrets.token_hex(20)}" for _ in range(n_neighbors)]
     nullifier_of = {w: f"null_{secrets.token_hex(8)}" for w in wallet_list}
 
     # Precalculate fraud pattern sizes. Patterns 1, 2 and 4 now ADD new rows
+    # (impossible travel needs two brand-new visit rows per incident); only
     # pattern 3 flips existing legitimate rows in place. So the base volume
     # has to leave room for three patterns, not two, to land on n_visits exactly.
     n_fraud_target = int(n_visits * 0.08)
@@ -133,7 +136,10 @@ def data_generate(n_businesses=50, n_neighbors=500, n_visits=20000, seed=42):
             'fraud_type': 'co_visit',
         }
 
-    # Pattern 3: Out-of-hours burst (unchanged: flips existing rows)
+    # --- Pattern 3: Out-of-hours burst (unchanged: flips existing rows) ---
+    # FIX #4: only pick from rows that are still legitimate. Sampling from
+    # df.index (all rows) could re-label an impossible_travel or co_visit
+    # row as out_of_hours, silently destroying the pattern it represented.
     idx_p3 = np.random.choice(df[df['is_fraud'] == 0].index, n_per_pattern, replace=False)
     for idx in idx_p3:
         df.loc[idx, 'is_fraud'] = 1
