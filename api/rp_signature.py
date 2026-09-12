@@ -18,6 +18,7 @@ signed with the EIP-191 prefix, as a recoverable 65-byte signature.
 """
 
 import secrets
+import string
 import time
 from dataclasses import dataclass
 
@@ -63,6 +64,34 @@ def message(
     return msg
 
 
+def _clean(key: str) -> str:
+    """What a copy-paste leaves around a value: spaces, newlines, quotes.
+
+    A dashboard field keeps whatever was pasted into it, and a key with a
+    trailing newline is indistinguishable from a wrong key when all the error
+    says is "invalid" — so trim it rather than make somebody guess.
+    """
+    return key.strip().strip('"').strip("'").strip()
+
+
+def _describe(raw: str, clean: str) -> str:
+    """The shape of a key, never the key.
+
+    This reaches an HTTP response, and the length and whether the characters
+    are hex give away nothing worth protecting — while being exactly what
+    tells a wrong paste from a wrong key on the first try.
+    """
+    body = clean[2:] if clean.lower().startswith("0x") else clean
+    digits = (
+        "hex digits"
+        if body and all(character in string.hexdigits for character in body)
+        else "not all hex digits"
+    )
+    prefix = "with 0x" if clean.lower().startswith("0x") else "without 0x"
+    trimmed = ", and had whitespace or quotes around it" if clean != raw else ""
+    return f"{len(body)} characters {prefix}, {digits}{trimmed}"
+
+
 def sign(
     *,
     signing_key: str,
@@ -72,12 +101,17 @@ def sign(
     action: str | None,
 ) -> str:
     """The deterministic half, kept apart so World's vectors can be fed in."""
+    key = _clean(signing_key)
     try:
-        signer = Account.from_key(signing_key)
+        signer = Account.from_key(key)
     except Exception:  # noqa: BLE001 — every parse failure means the same thing
         # `from None`: the underlying error can quote the key it choked on, and
         # this message reaches an HTTP response.
-        raise RpSignatureError("WORLD_RP_SIGNING_KEY is not a valid 32-byte key") from None
+        raise RpSignatureError(
+            "WORLD_RP_SIGNING_KEY is not a 32-byte hex key: "
+            f"{_describe(signing_key, key)}. World's key is 64 hex digits, "
+            "with or without a 0x prefix."
+        ) from None
 
     signable = encode_defunct(
         primitive=message(
@@ -90,7 +124,7 @@ def sign(
 def rp_context() -> RpContext:
     """A freshly signed context for one IDKit request."""
     config = get_config()
-    if not config.world_rp_signing_key:
+    if not config.world_rp_signing_key.strip():
         raise RpSignatureError("WORLD_RP_SIGNING_KEY is not set")
     if not config.world_rp_id:
         raise RpSignatureError("WORLD_RP_ID is not set")

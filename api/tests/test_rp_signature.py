@@ -140,3 +140,49 @@ def test_a_malformed_key_is_never_repeated_back(configured, monkeypatch):
     r = client.get("/world/rp-context")
     assert r.status_code == 501
     assert "zq" not in r.text
+
+
+@pytest.mark.parametrize(
+    "pasted",
+    [
+        "  " + WORLD_KEY + "  ",
+        WORLD_KEY + "\n",
+        '"' + WORLD_KEY + '"',
+        "'" + WORLD_KEY + "'\n",
+    ],
+)
+def test_a_key_pasted_with_spaces_or_quotes_still_signs(pasted):
+    """A dashboard field keeps whatever was pasted into it, and a trailing
+    newline is not a different key."""
+    nonce = rp_signature.hash_to_field(WORLD_RANDOM)
+    assert (
+        rp_signature.sign(
+            signing_key=pasted,
+            nonce=nonce,
+            created_at=CREATED_AT,
+            expires_at=EXPIRES_AT,
+            action=None,
+        )
+        == WORLD_SIGNATURE_NO_ACTION
+    )
+
+
+def test_the_error_describes_the_shape_so_it_can_be_fixed_in_one_try(
+    configured, monkeypatch
+):
+    """"Invalid" leaves you guessing between a wrong paste and a wrong key."""
+    monkeypatch.setattr(get_config(), "world_rp_signing_key", "0x" + "ab" * 31)
+    detail = client.get("/world/rp-context").json()["detail"]
+    assert "62 characters" in detail
+    assert "hex digits" in detail
+    assert "64 hex digits" in detail
+
+
+def test_the_error_says_when_something_was_wrapped_around_the_key(
+    configured, monkeypatch
+):
+    monkeypatch.setattr(get_config(), "world_rp_signing_key", '"0xnothex"\n')
+    detail = client.get("/world/rp-context").json()["detail"]
+    assert "not all hex digits" in detail
+    assert "whitespace or quotes around it" in detail
+    assert "nothex" not in detail
