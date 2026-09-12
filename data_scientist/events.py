@@ -41,8 +41,18 @@ LABEL_COLUMN = "is_fraud"
 #                    team decides where merchant category/description lives
 #       
 _VISITS_QUERY = """
-query GetVisits($first: Int!, $skip: Int!) {
-  visits(first: $first, skip: $skip, orderBy: timestamp, orderDirection: asc) {
+query GetVisits($first: Int!, $lastTimestamp: BigInt!, $lastId: String!) {
+  visits(
+    first: $first
+    orderBy: timestamp
+    orderDirection: asc
+    where: {
+      or: [
+        { timestamp_gt: $lastTimestamp }
+        { timestamp: $lastTimestamp, id_gt: $lastId }
+      ]
+    }
+  ) {
     id
     visitor { id }
     merchant { id }
@@ -122,49 +132,71 @@ def load_events_from_csv(path: str, require_label: bool = True) -> pd.DataFrame:
     return df[cols].copy()
 
 
-def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_pages: int = 50) -> pd.DataFrame:
+def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_pages: int = 1000) -> pd.DataFrame:
     """Adapter: subgraph (GraphQL) -> canonical event schema.
 
     This is the LIVE data source. The Graph's requirement is textual:
     inference for the demo must run against the subgraph, not a local or
-    simulated dataset — the CSV/generate.py path is for TRAINING only. This
-    function is that path: it paginates `visits` from a real deployed
-    subgraph and returns the exact same columns load_events_from_csv()
-    does (minus `is_fraud`, which doesn't exist for real events yet), so
-    build_features() and every model downstream run unmodified either way.
+    simulated dataset — the CSV/generate.py path is for TRAINING only.
 
-    HARDENING: each visit is parsed independently now. A single visit with
-    a missing `campaign`/`merchant`/`visitor` relationship, or a geohash
-    that fails to decode, is skipped (with a printed warning) instead of
-    raising and discarding the entire page's worth of otherwise-good
-    visits. If MANY rows are being skipped, that's a real data-quality
-    signal worth investigating (see the printed summary at the end) — not
-    something to silently swallow either.
+    FIX (real bug found running this against the live subgraph, reported
+    directly by the team): the previous skip-based pagination
+    (`skip: $skip`) is not a soft limit — The Graph rejects `skip > 5000`
+    with a hard GraphQL error, not an empty page. With page_size=1000 that
+    breaks on page 6 (skip=6000), roughly 8x earlier than the 50,000-row
+    ceiling this function's docstring used to (wrongly) claim. Worse: that
+    error is a RuntimeError, which score.py's wallet_score() catches and
+    turns into an HTTP 502 for EVERY wallet, not just during a reference
+    refresh — score_wallet() also calls this function directly to fetch a
+    target wallet's own events. Any subgraph with more than ~6,000 indexed
+    visits took the whole endpoint down, both on cold start (empty cache)
+    and on periodic refresh.
 
-    NOTE: field names here now match the ACTUAL deployed subgraph
-    (api.studio.thegraph.com/query/1758817/zone-go/v0.0.1) as reported in
-    the Día 4 code review — this was wrong before (see Observation #2) and
-    would have failed on the first real call. Still: I have not run this
-    against that live endpoint myself — this sandbox has no network access
-    to thegraph.com. The geohash decoding in particular (_resolve_lat_lon)
-    is my best guess at the encoding convention, not confirmed against
-    Sebastián's contract; verify the very first batch of decoded
-    coordinates land inside the actual campaign's neighborhood before
-    trusting this in the demo.
+    The fix is cursor-based pagination: track the LAST row's (timestamp,
+    id) from each page and ask for `timestamp_gt` that value, with an
+    `id_gt` tiebreaker for the case where more than `page_size` visits
+    share the exact same timestamp (otherwise `timestamp_gt` alone would
+    silently skip the overflow). This has no artificial ceiling — it is
+    the pattern The Graph's own docs recommend for exactly this reason, and
+    the same code handles both the initial backfill and every later
+    refresh, with no `skip` involved anywhere.
+
+    `max_pages` here is a genuine safety valve against a runaway loop (e.g.
+    a query bug that never advances the cursor), not a silent truncation
+    point like the old `skip`-based ceiling was: hitting it raises loudly
+    instead of returning a partial, unflagged dataset.
+
+    NOTE: field names match the ACTUAL deployed subgraph
+    (api.studio.thegraph.com/query/1758817/zone-go/v0.0.1). The cursor
+    query above uses graph-node's `or` where-combinator for the tiebreak
+    branch — standard in current graph-node versions, but I have not been
+    able to re-verify this exact query against the live endpoint myself (no
+    network access to thegraph.com from this environment); the team's own
+    report of the skip=5000 ceiling was empirical evidence from THEM
+    running the previous version live, not something I could reproduce
+    here. Re-confirm this cursor query directly against the deployed
+    subgraph before trusting it fully — if `or` isn't supported by this
+    graph-node version, it fails with a clear GraphQL schema error, not a
+    silent wrong result.
     """
     rows = []
     skipped = 0
+    last_timestamp = 0
+    last_id = ""
+
     for page in range(max_pages):
-        skip = page * page_size
         try:
             resp = requests.post(
                 subgraph_url,
-                json={"query": _VISITS_QUERY, "variables": {"first": page_size, "skip": skip}},
+                json={
+                    "query": _VISITS_QUERY,
+                    "variables": {"first": page_size, "lastTimestamp": str(last_timestamp), "lastId": last_id},
+                },
                 timeout=30,
             )
             resp.raise_for_status()
         except requests.exceptions.RequestException as exc:
-            raise RuntimeError(f"Subgraph request failed (page {page}, skip {skip}): {exc}") from exc
+            raise RuntimeError(f"Subgraph request failed (page {page}, cursor {last_timestamp}/{last_id}): {exc}") from exc
 
         payload = resp.json()
         if "errors" in payload:
@@ -192,8 +224,27 @@ def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_page
                 visit_id = v.get("id", "<unknown>") if isinstance(v, dict) else "<unknown>"
                 print(f"WARNING: skipping visit {visit_id} — {exc}")
 
+        # Advance the cursor from the LAST row of this page regardless of
+        # whether it was skipped above — a malformed geohash shouldn't
+        # stall the cursor and cause the same bad row to be requested
+        # forever.
+        last_row = visits[-1]
+        last_timestamp = int(last_row["timestamp"])
+        last_id = last_row["id"]
+
         if len(visits) < page_size:
             break  # last page
+    else:
+        # The for/else fires only if we exhausted max_pages without a
+        # short final page — i.e. the cursor never caught up. Raise loudly
+        # instead of returning a silently partial dataset, per the same
+        # principle as the old skip-based ceiling this replaces.
+        raise RuntimeError(
+            f"load_events_from_subgraph: hit max_pages={max_pages} without reaching the last "
+            f"page (cursor stuck at timestamp={last_timestamp}, id={last_id}). This means either "
+            f"there are more than {max_pages * page_size} visits indexed, or the cursor isn't "
+            f"advancing correctly — investigate before trusting a partial result."
+        )
 
     if skipped:
         print(f"load_events_from_subgraph: skipped {skipped} malformed visit(s) out of {skipped + len(rows)} fetched")
@@ -201,3 +252,4 @@ def load_events_from_subgraph(subgraph_url: str, page_size: int = 1000, max_page
     df = pd.DataFrame(rows, columns=EVENT_SCHEMA)
     _validate_schema(df, require_label=False)
     return df
+
