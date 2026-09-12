@@ -117,6 +117,8 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
     geohash = geohash_from_bytes32(node["geohash"])
     lat, lon = decode_geohash(geohash)
     merchant = node["merchant"]["id"]
+    balance = int(node["balance"])
+    reward = int(node["rewardPerVisit"])
 
     return Campaign(
         campaign_id=int(node["campaignId"]),
@@ -126,14 +128,23 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
         merchant_name=f"Merchant {merchant[:6]}…{merchant[-4:]}",
         category="",
         sells="",
-        reward_per_visit=int(node["rewardPerVisit"]),
+        reward_per_visit=reward,
         daily_cap=int(node["dailyCap"]) or 1,
         lat=lat,
         lon=lon,
         geohash=geohash,
         radius_meters=int(node["radiusMeters"]) or 1,
-        balance=int(node["balance"]),
-        active=bool(node["active"]),
+        balance=balance,
+        # The index's own flag says only that the merchant has not switched the
+        # campaign off. It says nothing about whether there is money left, and a
+        # campaign created but never funded comes back from it as active with a
+        # balance of zero — which is what search then puts on the map.
+        #
+        # Sending somebody on a fifteen-minute walk to a store that cannot pay
+        # them is the one failure this product cannot afford, so `active` here
+        # means what a visitor needs it to mean: switched on *and* able to cover
+        # one more visit.
+        active=bool(node["active"]) and balance >= reward,
         created_at=int(node["createdAt"]),
     )
 

@@ -6,6 +6,7 @@ a position read off the chain wins over the one the index has, because
 `CampaignCreated` does not carry a geohash yet.
 """
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 import pytest
@@ -94,6 +95,25 @@ def test_the_chain_position_wins_over_the_index(live, monkeypatch):
 def test_the_balance_comes_from_the_chain_not_the_index(live, monkeypatch):
     sources(monkeypatch, indexed=INDEXED, onchain=ON_CHAIN)
     assert client.get("/campaigns/1").json()["balance"] == 47_000_000
+
+
+def test_a_campaign_drained_since_the_last_block_stops_being_active(live, monkeypatch):
+    """Overlaying the balance without the flag that depends on it was the bug.
+
+    The index is a block behind and still shows money; the vault says it is
+    spent. Whoever walks there cannot be paid, so search has to stop offering
+    it the moment the chain says so.
+    """
+    sources(monkeypatch, indexed=INDEXED, onchain=replace(ON_CHAIN, balance=0))
+    body = client.get("/campaigns/1").json()
+    assert body["balance"] == 0
+    assert body["active"] is False
+
+
+def test_a_campaign_the_index_switched_off_is_not_revived_by_a_balance(live, monkeypatch):
+    """The overlay only ever narrows: the vault cannot see the off switch."""
+    sources(monkeypatch, indexed=INDEXED.model_copy(update={"active": False}), onchain=ON_CHAIN)
+    assert client.get("/campaigns/1").json()["active"] is False
 
 
 def test_the_index_still_supplies_what_the_chain_has_no_room_for(live, monkeypatch):

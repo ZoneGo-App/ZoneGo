@@ -21,6 +21,14 @@ class Campaign(BaseModel):
     geohash: str
     radius_meters: int = Field(..., gt=0, le=2000)
     balance: int = Field(..., ge=0)
+    """
+    Whether a visitor can be paid for walking here right now: the campaign is
+    switched on *and* the balance still covers one reward. Not the same as the
+    index's own `active` flag, which only knows about the switch — a campaign
+    created and never funded is active by that measure and worthless by this
+    one. Search hides anything false, so this is what keeps an empty store off
+    the map.
+    """
     active: bool = True
     # Null when the answer came from the vault rather than the subgraph: the
     # contract holds no creation time, only an index knows when something
