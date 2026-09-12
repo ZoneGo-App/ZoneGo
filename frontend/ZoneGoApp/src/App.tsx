@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
 import { Onboarding } from './screens/Onboarding'
@@ -6,14 +6,31 @@ import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
 import { ScanQr } from './screens/ScanQr'
 import { MerchantPanel } from './screens/MerchantPanel'
+import { MerchantProfileForm } from './screens/MerchantProfileForm'
+import { VisitorProfileForm } from './screens/VisitorProfileForm'
 import { IdentityCheck } from './screens/IdentityCheck'
 import { Leaderboard } from './screens/Leaderboard'
 import type { SearchHit, WorldAttestation } from './lib/api'
+import {
+  readMerchantProfile,
+  readVisitorProfile,
+  type MerchantProfile,
+  type VisitorProfile,
+} from './lib/profile'
 
 const ATTESTATION_STORAGE_KEY = 'zonego_attestation'
 
 type NeighborTab = 'explore' | 'myqr' | 'panel' | 'ranking'
 
+/**
+ * Reads a previously stored attestation, but only if it hasn't expired.
+ * The attestation itself carries a TTL set server-side (originally 120s,
+ * being extended by Lucio) — an expired one sitting in storage would just
+ * fail on chain, so there is no point handing it back to the UI as if it
+ * were still usable. Uses localStorage (not sessionStorage) so it survives
+ * closing the tab or the app — the whole point of extending the TTL is that
+ * daily use shouldn't keep re-triggering the selfie check.
+ */
 function readStoredAttestation(): WorldAttestation | null {
   const raw = localStorage.getItem(ATTESTATION_STORAGE_KEY)
   if (!raw) return null
@@ -35,10 +52,18 @@ function RoleFallback() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-bg px-6 text-center">
       <p className="text-ink-muted">We couldn't remember your role. How are you signing in?</p>
       <div className="flex gap-3">
-        <button type="button" onClick={() => setRole('comercio')} className="rounded-full bg-brand px-6 py-3 font-medium text-white">
+        <button
+          type="button"
+          onClick={() => setRole('comercio')}
+          className="rounded-full bg-brand px-6 py-3 font-medium text-white"
+        >
           I'm a merchant
         </button>
-        <button type="button" onClick={() => setRole('vecino')} className="rounded-full border border-border px-6 py-3 font-medium text-ink">
+        <button
+          type="button"
+          onClick={() => setRole('vecino')}
+          className="rounded-full border border-border px-6 py-3 font-medium text-ink"
+        >
           I'm a neighbor
         </button>
       </div>
@@ -58,7 +83,11 @@ function LogoutBar() {
 
   return (
     <div className="flex justify-end bg-bg px-4 pt-4">
-      <button type="button" onClick={handleLogout} className="text-sm text-ink-muted underline">
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="text-sm text-ink-muted underline"
+      >
         Log out
       </button>
     </div>
@@ -126,7 +155,9 @@ function BottomNav({ activeTab, onSelect }: { activeTab: NeighborTab; onSelect: 
               key={id}
               type="button"
               onClick={() => onSelect(id)}
-              className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 ${isActive ? 'text-brand' : 'text-ink-muted'}`}
+              className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 ${
+                isActive ? 'text-brand' : 'text-ink-muted'
+              }`}
             >
               <Icon active={isActive} />
               <span className="text-[11px] font-medium">{label}</span>
@@ -150,10 +181,32 @@ function MyPanelComingSoon() {
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
-  const [attestation, setAttestationState] = useState<WorldAttestation | null>(readStoredAttestation)
+  const [attestation, setAttestationState] = useState<WorldAttestation | null>(
+    readStoredAttestation,
+  )
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
   const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
   const [neighborTab, setNeighborTab] = useState<NeighborTab>('explore')
+  const [merchantProfile, setMerchantProfile] = useState<MerchantProfile | null>(null)
+  const [visitorProfile, setVisitorProfile] = useState<VisitorProfile | null>(null)
+
+  const merchantAddress = import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''
+  const visitorAddress = user?.wallet?.address
+
+  // Re-check localStorage for a saved profile whenever the relevant wallet
+  // address becomes available — it isn't known yet on the very first render,
+  // right after Privy finishes authenticating.
+  useEffect(() => {
+    if (role === 'comercio' && merchantAddress) {
+      setMerchantProfile(readMerchantProfile(merchantAddress))
+    }
+  }, [role, merchantAddress])
+
+  useEffect(() => {
+    if (role === 'vecino' && visitorAddress) {
+      setVisitorProfile(readVisitorProfile(visitorAddress))
+    }
+  }, [role, visitorAddress])
 
   function setAttestation(next: WorldAttestation) {
     localStorage.setItem(ATTESTATION_STORAGE_KEY, JSON.stringify(next))
@@ -187,25 +240,44 @@ function App() {
   if (!role) {
     content = <RoleFallback />
   } else if (role === 'comercio') {
-    content =
-      merchantView === 'scan' ? (
-        <ScanQr />
-      ) : (
-        <MerchantPanel
-          merchantAddress={import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''}
-          onGoToScan={() => setMerchantView('scan')}
-        />
+    if (!merchantAddress) {
+      content = (
+        <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-center">
+          <p className="text-red-600">
+            No wallet found for your account yet. Try signing out and back in.
+          </p>
+        </div>
       )
+    } else if (!merchantProfile) {
+      content = (
+        <MerchantProfileForm merchantAddress={merchantAddress} onComplete={setMerchantProfile} />
+      )
+    } else {
+      // Merchant side — unchanged: panel + scan, no bottom nav (doesn't map
+      // cleanly onto a role that scans QRs rather than showing its own).
+      content =
+        merchantView === 'scan' ? (
+          <ScanQr />
+        ) : (
+          <MerchantPanel merchantAddress={merchantAddress} onGoToScan={() => setMerchantView('scan')} />
+        )
+    }
   } else {
-    const visitorAddress = user?.wallet?.address
+    // Neighbor side.
     if (!visitorAddress) {
       content = (
         <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-center">
-          <p className="text-red-600">No wallet found for your account yet. Try signing out and back in.</p>
+          <p className="text-red-600">
+            No wallet found for your account yet. Try signing out and back in.
+          </p>
         </div>
       )
     } else if (!attestation) {
       content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
+    } else if (!visitorProfile) {
+      content = (
+        <VisitorProfileForm visitorAddress={visitorAddress} onComplete={setVisitorProfile} />
+      )
     } else {
       let tabContent: React.ReactNode
 
