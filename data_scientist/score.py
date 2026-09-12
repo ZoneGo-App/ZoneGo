@@ -1,13 +1,42 @@
 import os
+import sys
 
 import requests
 from fastapi import APIRouter, HTTPException
 
+# FIX: this used to be a try/except that imported from "infer" in BOTH
+# branches — a no-op fallback that silently defeated its own purpose (if
+# the first import ever failed, the except failed the exact same way).
+#
+# The deeper issue restoring "from ml.infer import ..." doesn't actually
+# fix: infer.py (and everything it imports — events.py, features.py,
+# graph_features.py) uses FLAT sibling imports ("from events import ...",
+# not "from .events import ..."). That only resolves if the ml/ directory
+# itself is on sys.path. Importing "ml" as a package from further up the
+# repo (`from ml.infer import ...`) gets past the first import fine, then
+# breaks one line into infer.py with "No module named 'events'" — tested
+# this directly, it reproduces every time. Converting every cross-import
+# inside ml/*.py to package-relative imports would fix it too, but touches
+# four files instead of one and changes how `python3 train.py` is run.
+#
+# This puts ml/ on sys.path first, THEN does the same flat import infer.py
+# itself uses — no changes needed to any file inside ml/.
+# ZONEGO_ML_DIR overrides the guess if ml/ lives somewhere else in your
+# real repo layout; otherwise a couple of common relative layouts are
+# tried automatically.
+_ML_DIR = os.environ.get("ZONEGO_ML_DIR")
+if not _ML_DIR:
+    _here = os.path.dirname(os.path.abspath(__file__))
+    for _candidate in ("../../ml", "../ml", "./ml", "."):
+        _resolved = os.path.normpath(os.path.join(_here, _candidate))
+        if os.path.isfile(os.path.join(_resolved, "infer.py")):
+            _ML_DIR = _resolved
+            break
 
-try:
-    from infer import score_wallet, load_bundle, get_operating_threshold
-except ImportError:
-    from infer import score_wallet, load_bundle, get_operating_threshold  # type: ignore
+if _ML_DIR and _ML_DIR not in sys.path:
+    sys.path.insert(0, _ML_DIR)
+
+from infer import score_wallet, load_bundle, get_operating_threshold  # noqa: E402
 
 router = APIRouter(prefix="/score", tags=["score"])
 
@@ -84,4 +113,6 @@ def wallet_score_threshold(point: str = "high_recall_point") -> float:
         return get_operating_threshold(bundle=bundle, point=point)
     except (FileNotFoundError, KeyError) as exc:
         raise HTTPException(status_code=503, detail=str(exc))
+
+
 
