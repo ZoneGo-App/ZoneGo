@@ -48,7 +48,6 @@ makes the actual response different depending on which one applies:
   recommendation at the end of this script.
 """
 
-
 import os
 import secrets
 from datetime import datetime, timedelta
@@ -64,6 +63,7 @@ BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "fraud_model.joblib")
 REPORT_PATH = os.path.join(os.path.dirname(__file__), "ATTACK_SIMULATION_REPORT.md")
 
 RANDOM_STATE = 7  # own seed, distinct from generate.py/train.py
+
 
 def _new_wallet():
     return f"0x{secrets.token_hex(20)}"
@@ -140,6 +140,7 @@ def simulate_farm_30_verified_wallets(businesses: pd.DataFrame, attack_start: da
         })
     return pd.DataFrame(rows)
 
+
 def simulate_self_visiting_business(businesses: pd.DataFrame, attack_start: datetime, target_hour_range: tuple = (10, 19)) -> pd.DataFrame:
     """2 new wallets (the merchant and/or a close accomplice) that visit
     ONLY their own business, 25 times each, spread over 10 days, during normal
@@ -171,6 +172,7 @@ def simulate_self_visiting_business(businesses: pd.DataFrame, attack_start: date
                 "fraud_type": "self_visiting_business",
             })
     return pd.DataFrame(rows)
+
 
 def simulate_neighbor_collusion(businesses: pd.DataFrame, attack_start: datetime, hour_range: tuple = (10, 20)) -> pd.DataFrame:
     """8 wallets alternating between EXACTLY the two closest businesses to
@@ -207,6 +209,7 @@ def simulate_neighbor_collusion(businesses: pd.DataFrame, attack_start: datetime
                 t = t + timedelta(minutes=int(rng.integers(20, 40)))
     return pd.DataFrame(rows)
 
+
 def score_cold(attack_df: pd.DataFrame, bundle: dict) -> pd.DataFrame:
     """Scenario "production today": exactly what infer.py does with a live
     wallet -- uses the FROZEN reference from the bundle, never recalculating
@@ -217,6 +220,7 @@ def score_cold(attack_df: pd.DataFrame, bundle: dict) -> pd.DataFrame:
     X = df[bundle["feature_columns"]].fillna(0)
     df["fraud_score"] = bundle["model"].predict_proba(X)[:, 1]
     return df
+
 
 def score_warm(background_df: pd.DataFrame, attack_df: pd.DataFrame, bundle: dict) -> pd.DataFrame:
     """Scenario "refreshed reference": simulates a periodic refresh of
@@ -234,6 +238,7 @@ def score_warm(background_df: pd.DataFrame, attack_df: pd.DataFrame, bundle: dic
     X = attack_only[bundle["feature_columns"]].fillna(0)
     attack_only["fraud_score"] = bundle["model"].predict_proba(X)[:, 1]
     return attack_only
+
 
 def detection_rate(scored_df: pd.DataFrame, threshold: float) -> float:
     if len(scored_df) == 0:
