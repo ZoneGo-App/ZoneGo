@@ -35,6 +35,28 @@ function RoleFallback() {
   )
 }
 
+function LogoutBar() {
+  const { logout } = usePrivy()
+  const { setRole } = useRole()
+
+  async function handleLogout() {
+    setRole(null)
+    await logout()
+  }
+
+  return (
+    <div className="flex justify-end px-4 pt-4">
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="text-sm text-gray-500 underline"
+      >
+        Log out
+      </button>
+    </div>
+  )
+}
+
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
@@ -55,78 +77,79 @@ function App() {
     return <Onboarding />
   }
 
+  let content: React.ReactNode
+
   if (!role) {
-    return <RoleFallback />
-  }
-
-  // Merchant side.
-  if (role === 'comercio') {
-    if (merchantView === 'scan') {
-      return <ScanQr />
+    content = <RoleFallback />
+  } else if (role === 'comercio') {
+    // Merchant side.
+    content =
+      merchantView === 'scan' ? (
+        <ScanQr />
+      ) : (
+        <MerchantPanel
+          merchantAddress={import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''}
+          onGoToScan={() => setMerchantView('scan')}
+        />
+      )
+  } else {
+    // Neighbor side.
+    const visitorAddress = user?.wallet?.address
+    if (!visitorAddress) {
+      content = (
+        <div className="flex min-h-screen items-center justify-center px-6 text-center">
+          <p className="text-red-600">
+            No wallet found for your account yet. Try signing out and back in.
+          </p>
+        </div>
+      )
+    } else if (!attestation) {
+      content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
+    } else if (showLeaderboard) {
+      content = (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowLeaderboard(false)}
+            className="px-4 pt-4 text-sm text-gray-600"
+          >
+            &larr; Back
+          </button>
+          <Leaderboard myAddress={visitorAddress} />
+        </div>
+      )
+    } else if (selectedHit) {
+      content = (
+        <MyQr
+          visitorAddress={visitorAddress}
+          campaign={selectedHit.campaign}
+          attestation={attestation}
+          onBack={() => setSelectedHit(null)}
+        />
+      )
+    } else {
+      content = (
+        <div>
+          <div className="flex justify-end px-4 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowLeaderboard(true)}
+              className="text-sm text-gray-600 underline"
+            >
+              Rankings
+            </button>
+          </div>
+          <Search onSelectCampaign={setSelectedHit} />
+        </div>
+      )
     }
-    return (
-      <MerchantPanel
-        merchantAddress={import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''}
-        onGoToScan={() => setMerchantView('scan')}
-      />
-    )
-  }
-
-  // Neighbor side.
-  const visitorAddress = user?.wallet?.address
-  if (!visitorAddress) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-6 text-center">
-        <p className="text-red-600">
-          No wallet found for your account yet. Try signing out and back in.
-        </p>
-      </div>
-    )
-  }
-
-  if (!attestation) {
-    return <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
-  }
-
-  if (showLeaderboard) {
-    return (
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowLeaderboard(false)}
-          className="px-4 pt-4 text-sm text-gray-600"
-        >
-          &larr; Back
-        </button>
-        <Leaderboard myAddress={visitorAddress} />
-      </div>
-    )
-  }
-
-  if (selectedHit) {
-    return (
-      <MyQr
-        visitorAddress={visitorAddress}
-        campaign={selectedHit.campaign}
-        attestation={attestation}
-        onBack={() => setSelectedHit(null)}
-      />
-    )
   }
 
   return (
-    <div>
-      <div className="flex justify-end px-4 pt-4">
-        <button
-          type="button"
-          onClick={() => setShowLeaderboard(true)}
-          className="text-sm text-gray-600 underline"
-        >
-          Rankings
-        </button>
-      </div>
-      <Search onSelectCampaign={setSelectedHit} />
-    </div>
+    <>
+      <LogoutBar />
+      {content}
+    </>
   )
 }
 
