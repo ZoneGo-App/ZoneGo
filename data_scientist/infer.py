@@ -3,11 +3,14 @@ from __future__ import annotations
 import os
 import sys
 import time
+import logging
 import joblib
 import pandas as pd
 
 from events import load_events_from_subgraph
 from features import FEATURES_ALL, add_sequential_features, fit_aggregated_features, apply_aggregated_features
+
+logger = logging.getLogger("zonego.infer")
 
 # Todo se resuelve relativo a este mismo archivo -- no importa en qué
 # carpeta viva el proyecto (no se asume "ml/", "backend/", ni ningún otro
@@ -31,6 +34,22 @@ MODEL_BUNDLE_PATH = os.environ.get("ZONEGO_MODEL_PATH", os.path.join(_BASE_DIR, 
 REFERENCE_TTL_SECONDS = int(os.environ.get("ZONEGO_REFERENCE_TTL_SECONDS", "1800"))  # 30 min por defecto
 
 _reference_cache = {"fitted": None, "fetched_at": 0.0, "subgraph_url": None}
+
+# FIX (reportado por el equipo, corrida real contra el subgraph): el
+# except amplio de abajo caía al fallback congelado con solo un print() --
+# invisible en cualquier setup de logs de producción real, justo en el
+# escenario donde Sybil se degrada de 100% a 0% de recall. Ahora se loguea
+# con logging.error() (nivel que sí se captura en la mayoría de configs) Y
+# se guarda en este dict, consultable desde afuera (ej. un endpoint de
+# healthcheck) sin tener que parsear logs.
+_degraded_state = {"is_degraded": False, "since": None, "reason": None}
+
+
+def is_reference_degraded() -> dict:
+    """Devuelve el estado de degradación actual -- para un endpoint de
+    healthcheck o un dashboard, sin depender de que alguien esté mirando
+    los logs en el momento exacto en que el subgraph falló."""
+    return dict(_degraded_state)
 
 
 def load_bundle() -> dict:
@@ -59,9 +78,10 @@ def _get_refreshed_reference(subgraph_url: str, bundle: dict, ttl_seconds: int =
     bundle (`bundle['fitted_features']`) en vez de tumbar el endpoint
     entero -- degradado en Sybil específicamente, pero sigue funcionando
     para los otros tres patrones de fraude, que no dependen de billeteras
-    nunca vistas. Se imprime una advertencia explícita cuando esto pasa,
-    porque es exactamente el escenario que el README documenta como "peor
-    caso".
+    nunca vistas. Esto ahora se loguea con logging.error() Y queda
+    disponible vía is_reference_degraded() -- un print() no alcanza para
+    algo que hay que poder detectar sin estar mirando la consola en el
+    momento exacto en que pasa.
     """
     now = time.monotonic()
     cache_is_fresh = (
@@ -80,10 +100,17 @@ def _get_refreshed_reference(subgraph_url: str, bundle: dict, ttl_seconds: int =
         df = add_sequential_features(all_events)
         fitted = fit_aggregated_features(df)
     except Exception as exc:  # noqa: BLE001 — cualquier falla del subgraph cae al fallback, no debe tumbar el scoring
-        print(f"WARNING: could not refresh graph reference from subgraph ({exc}). "
-              f"Falling back to the frozen training-time reference — Sybil detection "
-              f"specifically will be degraded until the next successful refresh.")
+        logger.error(
+            "Could not refresh graph reference from subgraph (%s). Falling back to the "
+            "frozen training-time reference — Sybil detection specifically will be "
+            "degraded until the next successful refresh.", exc, exc_info=True,
+        )
+        _degraded_state.update({"is_degraded": True, "since": time.time(), "reason": str(exc)})
         return bundle['fitted_features']
+
+    if _degraded_state["is_degraded"]:
+        logger.info("Graph reference refresh recovered — no longer running on the frozen fallback.")
+    _degraded_state.update({"is_degraded": False, "since": None, "reason": None})
 
     _reference_cache.update({"fitted": fitted, "fetched_at": now, "subgraph_url": subgraph_url})
     return fitted
