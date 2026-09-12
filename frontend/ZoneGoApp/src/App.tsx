@@ -14,17 +14,20 @@ const ATTESTATION_STORAGE_KEY = 'zonego_attestation'
 
 /**
  * Reads a previously stored attestation, but only if it hasn't expired.
- * The attestation itself carries a short TTL (120s, set server-side) — an
- * expired one sitting in storage would just fail on chain, so there is no
- * point handing it back to the UI as if it were still usable.
+ * The attestation itself carries a TTL set server-side (originally 120s,
+ * being extended by Lucio) — an expired one sitting in storage would just
+ * fail on chain, so there is no point handing it back to the UI as if it
+ * were still usable. Uses localStorage (not sessionStorage) so it survives
+ * closing the tab or the app — the whole point of extending the TTL is that
+ * daily use shouldn't keep re-triggering the selfie check.
  */
 function readStoredAttestation(): WorldAttestation | null {
-  const raw = sessionStorage.getItem(ATTESTATION_STORAGE_KEY)
+  const raw = localStorage.getItem(ATTESTATION_STORAGE_KEY)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as WorldAttestation
     if (parsed.expiry <= Math.floor(Date.now() / 1000)) {
-      sessionStorage.removeItem(ATTESTATION_STORAGE_KEY)
+      localStorage.removeItem(ATTESTATION_STORAGE_KEY)
       return null
     }
     return parsed
@@ -64,7 +67,7 @@ function LogoutBar() {
 
   async function handleLogout() {
     setRole(null)
-    sessionStorage.removeItem(ATTESTATION_STORAGE_KEY)
+    localStorage.removeItem(ATTESTATION_STORAGE_KEY)
     await logout()
   }
 
@@ -92,7 +95,7 @@ function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false)
 
   function setAttestation(next: WorldAttestation) {
-    sessionStorage.setItem(ATTESTATION_STORAGE_KEY, JSON.stringify(next))
+    localStorage.setItem(ATTESTATION_STORAGE_KEY, JSON.stringify(next))
     setAttestationState(next)
   }
 
