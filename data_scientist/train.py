@@ -16,9 +16,9 @@ from features import (
     add_sequential_features, fit_aggregated_features, apply_aggregated_features,
 )
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "visits.csv")
-README_PATH = os.path.join(os.path.dirname(__file__), "README.md")
-MODEL_BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "fraud_model.joblib")
+DATA_PATH = os.environ.get("ZONEGO_DATA_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "visits.csv"))
+README_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "README.md")
+MODEL_BUNDLE_PATH = os.environ.get("ZONEGO_MODEL_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fraud_model.joblib"))
 
 MIN_FRAUD_RECALL_TARGET = 0.85
 
