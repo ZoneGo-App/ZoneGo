@@ -95,25 +95,25 @@ function SelfieCheckWidget({
     )
   }
 
+  let connectionStep: React.ReactNode = null
+  if (flow.isAwaitingUserConnection && flow.connectorURI) {
+        connectionStep = isMobileDevice() ? (
+      <a href={flow.connectorURI} className="block w-full rounded-full bg-brand px-6 py-3 text-center font-medium text-white">
+        Open World App
+      </a>
+    ) : (
+      <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+        <QRCodeSVG value={flow.connectorURI} size={220} />
+        <p className="mt-2 text-center text-xs text-ink-muted">
+          Scan with the World App on your phone
+        </p>
+      </div>
+    )
+  }
+
   return (
     <>
-      {flow.isAwaitingUserConnection && flow.connectorURI && (
-        isMobileDevice() ? (
-          
-            href={flow.connectorURI}
-            className="block w-full rounded-full bg-brand px-6 py-3 text-center font-medium text-white"
-          >
-            Open World App
-          </a>
-        ) : (
-          <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
-            <QRCodeSVG value={flow.connectorURI} size={220} />
-            <p className="mt-2 text-center text-xs text-ink-muted">
-              Scan with the World App on your phone
-            </p>
-          </div>
-        )
-      )}
+      {connectionStep}
 
       {flow.isAwaitingUserConfirmation && (
         <p className="text-sm text-ink-muted">Confirm the selfie check in the World App...</p>
