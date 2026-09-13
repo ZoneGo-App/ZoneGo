@@ -1,5 +1,5 @@
 """
-Graph-only features (Día 4 of the plan).
+Graph-only features (Day 4 of the plan).
 
 Each of these needs the FULL indexed history across MANY wallets and
 businesses -- not just one wallet's own sequence -- which is exactly why
@@ -147,3 +147,4 @@ def apply_graph_features(df: pd.DataFrame, reference: dict) -> pd.DataFrame:
     df["temporal_concentration"] = df["business_id"].map(reference["temporal_concentration"]).fillna(0)
     df["sybil_score"] = df["wallet"].map(reference["sybil_score"]).fillna(0)
     return df
+
