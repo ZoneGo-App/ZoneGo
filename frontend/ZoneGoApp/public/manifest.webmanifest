@@ -1,0 +1,16 @@
+{
+  "name": "ZoneGo",
+  "short_name": "ZoneGo",
+  "description": "Get paid for walking into a real store.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f3ee",
+  "theme_color": "#16a38a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

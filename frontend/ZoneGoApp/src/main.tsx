@@ -7,10 +7,14 @@ import App from './App.tsx'
 
 const privyAppId = import.meta.env.VITE_PRIVY_APP_ID
 
-if (!privyAppId) {
-  throw new Error(
-    'Falta VITE_PRIVY_APP_ID. Creá frontend/ZoneGoApp/.env con esa variable (mirá .env.example).',
-  )
+// Registered only in a real build. In dev it would sit between Vite's hot
+// reload and the page for no benefit.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // An install prompt that never appears is not worth an error to the user.
+    })
+  })
 }
 
 createRoot(document.getElementById('root')!).render(
