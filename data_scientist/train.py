@@ -22,44 +22,42 @@ MODEL_BUNDLE_PATH = os.environ.get("ZONEGO_MODEL_PATH", os.path.join(os.path.dir
 
 MIN_FRAUD_RECALL_TARGET = 0.85
 
-# FIX (regresión encontrada al correr train.py con datos reales): los rasgos
-# de grafo (covisit_partners, sybil_score, wallet_farm_signal) se calculaban
-# UNA sola vez sobre df_train y quedaban congelados. El patrón Sybil usa una
-# billetera nueva por cada reclamo -- NUNCA se repite -- así que en
-# producción esas billeteras jamás van a estar en una referencia congelada
-# en el momento del entrenamiento, sin importar qué tan bien entrenado esté
-# el modelo. Verificado: recall de repeated_nullifier caía de 100% a 0% con
-# la referencia congelada, y volvía a 100% recalculándola sobre el propio
-# lote a puntuar.
+# FIX (regression found running train.py on real data): the graph
+# features (covisit_partners, sybil_score, wallet_farm_signal) were
+# computed ONCE over df_train and stayed frozen. The Sybil pattern uses a
+# new wallet for every claim -- it NEVER repeats -- so in production
+# those wallets will never be in a reference frozen at training time, no
+# matter how well trained the model is. Verified: repeated_nullifier
+# recall dropped from 100% to 0% with the frozen reference, and went
+# back to 100% recalculating it over the very batch being scored.
 #
-# La arquitectura correcta para este sistema (no un ML clásico con train/test
-# de poblaciones distintas): los rasgos de grafo describen el ESTADO ACTUAL
-# de la red de visitas, no una generalización aprendida de un conjunto fijo.
-# infer.py ahora refresca esa referencia periódicamente contra todo lo
-# indexado en el subgraph (ver infer.py::_get_refreshed_reference). Por eso
-# aquí medimos y reportamos DOS escenarios en vez de uno:
+# The correct architecture for this system (not classic ML with train/test
+# from distinct populations): graph features describe the CURRENT STATE
+# of the visit network, not a generalization learned from a fixed set.
+# infer.py now periodically refreshes that reference against everything
+# indexed in the subgraph (see infer.py::_get_refreshed_reference). That's
+# why here we measure and report TWO scenarios instead of one:
 #
-#   "frozen"  -- referencia calculada solo con train, aplicada a test.
-#                Es el peor caso: qué pasa si el refresco de infer.py
-#                falla o el trabajo periódico no corrió a tiempo.
-#   "refreshed" -- referencia recalculada sobre TODO el dataset (train+test)
-#                antes de puntuar test. Es lo que infer.py hace de verdad en
-#                producción, y el número que hay que presentar como
-#                desempeño esperado.
+#   "frozen"    -- reference computed only from train, applied to test.
+#                  This is the worst case: what happens if infer.py's
+#                  refresh fails or the periodic job didn't run in time.
+#   "refreshed" -- reference recalculated over the WHOLE dataset
+#                  (train+test) before scoring test. This is what infer.py
+#                  actually does in production, and the number that should
+#                  be reported as expected performance.
 #
-# Esto no es fuga de la etiqueta: los rasgos de grafo son puramente
-# estructurales (quién visitó qué, con quién, cuándo) -- nunca miran
-# is_fraud. Lo que cambia es si la referencia conoce la ESTRUCTURA de
-# billeteras/comercios de test, que es exactamente lo que una referencia
-# refrescada en producción vería también.
+# This is not label leakage: graph features are purely structural (who
+# visited what, with whom, when) -- they never look at is_fraud. What
+# changes is whether the reference knows the test wallets/merchants'
+# STRUCTURE, which is exactly what a reference refreshed in production
+# would also see.
 
 
 def build_features(events_df: pd.DataFrame, test_size=0.2, random_state=42):
-    """Construye ambos escenarios (frozen y refreshed) a partir de un mismo
-    split. Devuelve todo lo necesario para entrenar (siempre con la
-    referencia frozen, calculada solo con train -- así el modelo aprende
-    con la misma disciplina de siempre) y para evaluar en los dos
-    escenarios."""
+    """Builds both scenarios (frozen and refreshed) from the same split.
+    Returns everything needed to train (always with the frozen reference,
+    computed only from train -- so the model learns with the same
+    discipline as always) and to evaluate in both scenarios."""
     print("1. Computing features from the event schema...")
     if LABEL_COLUMN not in events_df.columns:
         raise ValueError(
@@ -76,17 +74,17 @@ def build_features(events_df: pd.DataFrame, test_size=0.2, random_state=42):
     df_train = df.loc[train_idx].copy()
     df_test = df.loc[test_idx].copy()
 
-    # Entrenamiento: SIEMPRE con la referencia frozen (solo train). El
-    # modelo aprende a interpretar los rasgos tal como se ven con una
-    # referencia razonable -- no necesita ver test para eso.
+    # Training: ALWAYS with the frozen reference (train only). The model
+    # learns to interpret the features as they look with a reasonable
+    # reference -- it doesn't need to see test for that.
     fitted_frozen = fit_aggregated_features(df_train)
     df_train_frozen = apply_aggregated_features(df_train.copy(), fitted_frozen)
     df_test_frozen = apply_aggregated_features(df_test.copy(), fitted_frozen)
 
-    # Evaluación de producción: referencia recalculada sobre TODO el
-    # dataset (train+test), aplicada a test. Esto simula lo que infer.py
-    # hace de verdad -- refrescar contra todo lo indexado -- y es el
-    # número que hay que reportar como desempeño esperado.
+    # Production evaluation: reference recalculated over the WHOLE dataset
+    # (train+test), applied to test. This simulates what infer.py actually
+    # does -- refreshing against everything indexed -- and is the number
+    # that should be reported as expected performance.
     fitted_refreshed = fit_aggregated_features(df)
     df_test_refreshed = apply_aggregated_features(df_test.copy(), fitted_refreshed)
 
@@ -94,7 +92,7 @@ def build_features(events_df: pd.DataFrame, test_size=0.2, random_state=42):
     y_train = df_train_frozen[LABEL_COLUMN]
     X_test_frozen = df_test_frozen[FEATURES_ALL].fillna(0)
     X_test_refreshed = df_test_refreshed[FEATURES_ALL].fillna(0)
-    y_test = df_test_frozen[LABEL_COLUMN]  # mismo test, mismo orden, misma y
+    y_test = df_test_frozen[LABEL_COLUMN]  # same test set, same order, same y
 
     return X_train, X_test_frozen, X_test_refreshed, y_train, y_test, fitted_frozen
 
@@ -169,11 +167,11 @@ def train_and_evaluate():
     lr.fit(X_train[FEATURES_ALL], y_train)
     y_pred_lr = lr.predict(X_test_refreshed[FEATURES_ALL])
 
-    # v1 (Día 2/3) como referencia -- no depende de referencia de grafo, así
-    # que "frozen" y "refreshed" le dan exactamente lo mismo.
+    # v1 (Day 2/3) as reference -- doesn't depend on the graph reference,
+    # so "frozen" and "refreshed" give it exactly the same result.
     f1_v1, recall_v1, _ = _fit_and_score(X_train, y_train, X_test_refreshed, y_test, FEATURES_V1, use_sample_weight=True)
 
-    # v1 + grafo, medido en AMBOS escenarios con el MISMO modelo entrenado.
+    # v1 + graph, measured in BOTH scenarios with the SAME trained model.
     weights = compute_sample_weight('balanced', y_train)
     gb = GradientBoostingClassifier(random_state=42)
     gb.fit(X_train[FEATURES_ALL], y_train, sample_weight=weights)
@@ -212,9 +210,9 @@ def train_and_evaluate():
     importances = sorted(zip(FEATURES_ALL, gb.feature_importances_), key=lambda p: p[1], reverse=True)
     top_features = importances[:3]
 
-    # El umbral operativo se elige sobre las probabilidades REFRESCADAS,
-    # porque eso es lo que infer.py va a servir en producción -- elegirlo
-    # sobre las congeladas subestimaría el recall real disponible.
+    # The operating threshold is chosen over the REFRESHED probabilities,
+    # because that is what infer.py will serve in production -- choosing
+    # it over the frozen ones would underestimate the real available recall.
     threshold_info = select_operating_threshold(y_test.values, y_proba_gb)
 
     write_readme_ml(results, graph_comparison, top_features, threshold_info,
@@ -222,7 +220,7 @@ def train_and_evaluate():
 
     joblib.dump({
         'model': gb,
-        'fitted_features': fitted_frozen,  # fallback si el subgraph no responde -- ver infer.py
+        'fitted_features': fitted_frozen,  # fallback if the subgraph doesn't respond -- see infer.py
         'feature_columns': FEATURES_ALL,
         'threshold_info': threshold_info,
     }, MODEL_BUNDLE_PATH)
@@ -274,7 +272,7 @@ def write_readme_ml(results, graph_comparison, top_features, threshold_info, n_t
     hrp = threshold_info["high_recall_point"]
     target = threshold_info["min_fraud_recall_target"]
     target_warning = (
-        f"\n> **Nota:** ningún umbral alcanzó el piso de recall objetivo ({target:.0%}).\n"
+        f"\n> **Note:** no threshold reached the target recall floor ({target:.0%}).\n"
         if threshold_info["high_recall_target_missed"] else ""
     )
 
@@ -284,69 +282,67 @@ Automatically generated by `train.py` on {datetime.now().strftime('%Y-%m-%d %H:%
 
 80/20 stratified split by `is_fraud`. Train: {n_train} rows · Test: {n_test} rows.
 
-Features v1 (Día 2/3): `previous_time`, `implied_velocity`, `hour_deviation`, `covisit_degree`.
-Graph features (Día 4): `covisit_partners`, `business_entropy`, `temporal_concentration`,
+Features v1 (Day 2/3): `previous_time`, `implied_velocity`, `hour_deviation`, `covisit_degree`.
+Graph features (Day 4): `covisit_partners`, `business_entropy`, `temporal_concentration`,
 `sybil_score`, `wallet_farm_signal`.
 
 | Model | F1-Macro | Fraud Recall |
 |---|---|---|
 {rows}
 
-## ⚠️ Hallazgo crítico y cómo se resolvió: referencia de grafo congelada vs. refrescada
+## ⚠️ Critical finding and how it was resolved: frozen vs. refreshed graph reference
 
-Los rasgos de grafo describen el ESTADO ACTUAL de la red de visitas — no
-son una generalización que el modelo aprende una vez y ya. El patrón
-`repeated_nullifier` (Sybil) usa una billetera nueva por cada reclamo, así
-que una referencia calculada UNA sola vez en el entrenamiento nunca va a
-conocer esas billeteras en producción, sin importar qué tan bien entrenado
-esté el modelo:
+Graph features describe the CURRENT STATE of the visit network — they are
+not a generalization the model learns once and is done with. The
+`repeated_nullifier` (Sybil) pattern uses a new wallet for every claim, so
+a reference computed ONCE at training time will never know about those
+wallets in production, no matter how well trained the model is:
 
-| Escenario | F1-Macro | Fraud Recall |
+| Scenario | F1-Macro | Fraud Recall |
 |---|---|---|
-| Referencia **congelada** (solo train, nunca se actualiza) | {graph_comparison['day4_f1_frozen']:.4f} | {graph_comparison['day4_recall_frozen']:.4f} |
-| Referencia **refrescada** (recalculada sobre todo lo indexado — lo que `infer.py` hace de verdad) | {graph_comparison['day4_f1']:.4f} | {graph_comparison['day4_recall']:.4f} |
+| **Frozen** reference (train only, never updated) | {graph_comparison['day4_f1_frozen']:.4f} | {graph_comparison['day4_recall_frozen']:.4f} |
+| **Refreshed** reference (recalculated over everything indexed — what `infer.py` actually does) | {graph_comparison['day4_f1']:.4f} | {graph_comparison['day4_recall']:.4f} |
 
-**`infer.py` refresca la referencia periódicamente contra el subgraph
-completo — el número de la fila "refrescada" es el que corre en
-producción.** La fila "congelada" queda documentada como el peor caso: qué
-pasa si el trabajo de refresco falla o el subgraph no responde y el
-sistema cae al fallback estático.
+**`infer.py` periodically refreshes the reference against the full
+subgraph — the number in the "refreshed" row is the one that runs in
+production.** The "frozen" row is documented as the worst case: what
+happens if the refresh job fails or the subgraph doesn't respond and the
+system falls back to the static fallback.
 
-## Día 4 — mejora de los rasgos de grafo (medida con referencia refrescada)
+## Day 4 — graph feature improvement (measured with refreshed reference)
 
 | Feature set | F1-Macro | Fraud Recall |
 |---|---|---|
-| Día 2/3 solo | {graph_comparison['day2_f1']:.4f} | {graph_comparison['day2_recall']:.4f} |
-| + rasgos de grafo (Día 4, refrescados) | {graph_comparison['day4_f1']:.4f} | {graph_comparison['day4_recall']:.4f} |
+| Day 2/3 only | {graph_comparison['day2_f1']:.4f} | {graph_comparison['day2_recall']:.4f} |
+| + graph features (Day 4, refreshed) | {graph_comparison['day4_f1']:.4f} | {graph_comparison['day4_recall']:.4f} |
 | **Delta** | **{'+' if delta_f1>=0 else ''}{delta_f1:.4f}** | **{'+' if delta_recall>=0 else ''}{delta_recall:.4f}** |
 
 ## Three highest-weighted features
 
 {top_features_lines}
 
-## Umbral operativo (curva precisión-recall sobre probabilidades refrescadas)
+## Operating threshold (precision-recall curve over refreshed probabilities)
 
 {target_warning}
-| Punto | Umbral | Fraude detectado (recall) | Fraude que se escapa | Legítimos retenidos |
+| Point | Threshold | Fraud caught (recall) | Fraud missed | Legit held |
 |---|---|---|---|---|
-| **F1 óptimo** | {f1p['threshold']:.4f} | {f1p['fraud_recall']:.2%} | {f1p['fraud_missed_rate']:.2%} | {f1p['legit_hold_rate']:.2%} |
-| **Alto recall** (objetivo ≥{target:.0%}) | {hrp['threshold']:.4f} | {hrp['fraud_recall']:.2%} | {hrp['fraud_missed_rate']:.2%} | {hrp['legit_hold_rate']:.2%} |
+| **Optimal F1** | {f1p['threshold']:.4f} | {f1p['fraud_recall']:.2%} | {f1p['fraud_missed_rate']:.2%} | {f1p['legit_hold_rate']:.2%} |
+| **High recall** (target ≥{target:.0%}) | {hrp['threshold']:.4f} | {hrp['fraud_recall']:.2%} | {hrp['fraud_missed_rate']:.2%} | {hrp['legit_hold_rate']:.2%} |
 
-## ¿Qué pasa si el modelo se equivoca?
+## What happens if the model gets it wrong?
 
-- **La retención es reversible, no una confiscación.** Un `fraud_score` alto
-  pausa el pago mientras se revisa; no lo cancela.
-- **El vecino puede apelar.** Un falso positivo tiene salida: revisión
-  humana y liberación del pago. Un falso negativo no tiene apelación
-  equivalente del lado del comerciante — por eso el punto de "alto
-  recall" está justificado.
-- **El score nunca decide solo.** `wallet_score()` devuelve solo la
-  probabilidad `[0, 1]`; la conversión a basis points y la decisión de
-  retener viven en el árbol de pagos, no en el modelo.
-- **Si el refresco de la referencia falla**, el sistema cae al fallback
-  congelado — peor en Sybil específicamente (ver tabla de arriba), pero
-  sigue funcionando para los otros tres patrones, que no dependen de
-  billeteras nunca vistas.
+- **Retention is reversible, not a confiscation.** A high `fraud_score`
+  pauses the payout while it's reviewed; it does not cancel it.
+- **The neighbor can appeal.** A false positive has a way out: human
+  review and payout release. A false negative has no equivalent appeal on
+  the merchant's side — which is why the "high recall" point is justified.
+- **The score never decides alone.** `wallet_score()` returns only the
+  `[0, 1]` probability; converting it to basis points and deciding
+  whether to hold live in the payment tree, not in the model.
+- **If the reference refresh fails**, the system falls back to the frozen
+  fallback — worse for Sybil specifically (see table above), but still
+  works for the other three patterns, which don't depend on never-seen
+  wallets.
 
 ## Conclusion
 
