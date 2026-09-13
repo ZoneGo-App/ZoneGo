@@ -28,9 +28,11 @@ def _from_chain(onchain: chain.OnChainCampaign) -> Campaign:
         geohash=onchain.geohash,
         radius_meters=onchain.radius_meters or 1,
         balance=onchain.balance,
-        # A campaign with nothing left in it cannot pay for a visit, and the
-        # contract has no flag of its own to read instead.
-        active=onchain.balance > 0,
+        # The same rule the subgraph path applies, for the same reason: a
+        # balance of one cent cannot cover a five-cent reward, so it is not
+        # active in the only sense a visitor cares about. The contract has no
+        # flag of its own to read instead.
+        active=onchain.balance >= onchain.reward_per_visit,
     )
 
 
@@ -61,6 +63,17 @@ def _with_live_state(campaign: Campaign) -> Campaign:
             "lon": onchain.lon,
             "radius_meters": onchain.radius_meters or campaign.radius_meters,
             "balance": onchain.balance,
+            # Overlaying the balance without the flag that depends on it was
+            # the bug: a campaign drained since the last block indexed kept
+            # reading as active, which is the exact staleness this function
+            # exists to correct.
+            #
+            # Only ever narrows. `campaign.active` false can mean the merchant
+            # switched it off, which the vault cannot tell us, so a campaign
+            # funded seconds ago waits for the next index before it comes back
+            # — a short wait in the safe direction, rather than a walk to a
+            # store that cannot pay.
+            "active": campaign.active and onchain.balance >= campaign.reward_per_visit,
         }
     )
 

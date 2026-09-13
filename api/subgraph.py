@@ -54,6 +54,22 @@ query Campaign($id: Bytes!) {{
 }}
 """
 
+# What the chain already knows about one visitor: which human they proved to
+# be, and when they last walked anywhere. Both come from `VisitRegistry` — the
+# nullifier is written on their first claim and cannot move afterwards — so
+# this asks the index to repeat a fact rather than to be trusted with one.
+VISITOR_STANDING = """
+query VisitorStanding($id: Bytes!) {
+  visitor(id: $id) {
+    id
+    nullifierHash
+    visits(first: 1, orderBy: timestamp, orderDirection: desc) {
+      timestamp
+    }
+  }
+}
+"""
+
 # Everyone who was seen inside one epoch. Ordered by timestamp so the page we
 # take is the earliest slice of the window rather than an arbitrary one — an
 # epoch has to be rebuildable to the same root by anyone who asks.
@@ -100,7 +116,10 @@ def run(document: str, variables: dict[str, Any]) -> dict[str, Any]:
         )
         response.raise_for_status()
         body = response.json()
-    except httpx.HTTPError as exc:
+    # InvalidURL is not an HTTPError — it is a plain Exception — so listing it
+    # separately is the difference between a 502 that names a bad SUBGRAPH_URL
+    # and a 500 that names nothing.
+    except (httpx.HTTPError, httpx.InvalidURL) as exc:
         raise SubgraphError(f"subgraph request failed: {exc}") from exc
 
     # GraphQL answers 200 with an errors array, so a failed query looks like a
@@ -117,6 +136,8 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
     geohash = geohash_from_bytes32(node["geohash"])
     lat, lon = decode_geohash(geohash)
     merchant = node["merchant"]["id"]
+    balance = int(node["balance"])
+    reward = int(node["rewardPerVisit"])
 
     return Campaign(
         campaign_id=int(node["campaignId"]),
@@ -126,14 +147,23 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
         merchant_name=f"Merchant {merchant[:6]}…{merchant[-4:]}",
         category="",
         sells="",
-        reward_per_visit=int(node["rewardPerVisit"]),
+        reward_per_visit=reward,
         daily_cap=int(node["dailyCap"]) or 1,
         lat=lat,
         lon=lon,
         geohash=geohash,
         radius_meters=int(node["radiusMeters"]) or 1,
-        balance=int(node["balance"]),
-        active=bool(node["active"]),
+        balance=balance,
+        # The index's own flag says only that the merchant has not switched the
+        # campaign off. It says nothing about whether there is money left, and a
+        # campaign created but never funded comes back from it as active with a
+        # balance of zero — which is what search then puts on the map.
+        #
+        # Sending somebody on a fifteen-minute walk to a store that cannot pay
+        # them is the one failure this product cannot afford, so `active` here
+        # means what a visitor needs it to mean: switched on *and* able to cover
+        # one more visit.
+        active=bool(node["active"]) and balance >= reward,
         created_at=int(node["createdAt"]),
     )
 
@@ -141,6 +171,31 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
 def list_campaigns(first: int = 100) -> list[Campaign]:
     data = run(LIST_CAMPAIGNS, {"first": first})
     return [to_campaign(node) for node in data.get("campaigns", [])]
+
+
+def visitor_standing(visitor: str) -> tuple[str, int] | None:
+    """The nullifier this wallet is bound to, and when it last claimed.
+
+    Returns None when the chain has never seen them prove anything — no
+    visitor, or a visitor with no nullifier yet — which is the case that has to
+    go through Selfie Check rather than around it.
+
+    The timestamp is the last visit rather than the moment they verified,
+    because we keep no record of the second and the chain keeps the first.
+    Today every claim carries a fresh attestation, so the two are the same
+    instant; if that ever stops being true this reads older than reality, which
+    is the safe direction — it asks for a selfie sooner, never later.
+    """
+    node = run(VISITOR_STANDING, {"id": visitor.lower()}).get("visitor")
+    if not node:
+        return None
+
+    nullifier = node.get("nullifierHash")
+    visits = node.get("visits") or []
+    if not nullifier or not visits:
+        return None
+
+    return nullifier, int(visits[0]["timestamp"])
 
 
 def get_campaign(campaign_id: int) -> Campaign | None:

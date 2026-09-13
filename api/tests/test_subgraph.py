@@ -63,6 +63,35 @@ def test_the_geohash_comes_back_as_coordinates(monkeypatch):
     assert -73.99 < campaign.lon < -73.98
 
 
+def test_a_campaign_with_no_money_is_not_active(monkeypatch):
+    """The one the live subgraph actually served us.
+
+    Campaign 1 was created and never funded, and came back from the index as
+    active with a balance of zero — so search put a store on the map that
+    could not pay anybody who walked there.
+    """
+    answer(monkeypatch, {"data": {"campaigns": [{**NODE, "balance": "0"}]}})
+    campaign = subgraph.list_campaigns()[0]
+    assert campaign.balance == 0
+    assert campaign.active is False
+
+
+def test_a_balance_under_one_reward_is_not_active(monkeypatch):
+    """Four cents cannot pay a five-cent reward, so it is not worth a walk."""
+    answer(monkeypatch, {"data": {"campaigns": [{**NODE, "balance": "49999"}]}})
+    assert subgraph.list_campaigns()[0].active is False
+
+
+def test_exactly_one_reward_left_is_still_active(monkeypatch):
+    answer(monkeypatch, {"data": {"campaigns": [{**NODE, "balance": "50000"}]}})
+    assert subgraph.list_campaigns()[0].active is True
+
+
+def test_a_switched_off_campaign_stays_off_however_funded(monkeypatch):
+    answer(monkeypatch, {"data": {"campaigns": [{**NODE, "active": False}]}})
+    assert subgraph.list_campaigns()[0].active is False
+
+
 def test_a_graphql_error_is_not_an_empty_result(monkeypatch):
     """GraphQL answers 200 with an errors array — the trap this guards."""
     answer(monkeypatch, {"errors": [{"message": "store not indexed"}]})

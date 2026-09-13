@@ -13,7 +13,7 @@ from web3 import Web3
 from api import relay
 from api.config import get_config
 
-REGISTRY = "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
+REGISTRY = "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
 # Test key, never funded, never used anywhere but here.
 RELAY_KEY = "0x" + "11" * 32
 TX_HASH = "0x" + "ab" * 32
@@ -26,6 +26,8 @@ A_CLAIM = relay.Claim(
     signature="0x" + "b2" * 65,
     visitor="0x" + "a1" * 20,
     nullifier_hash="0x" + "c3" * 32,
+    attestation_expiry=1788800100,
+    attestation_signature="0x" + "d4" * 65,
 )
 
 BLOCK = {
@@ -98,10 +100,18 @@ def test_the_signed_fields_reach_the_contract_unchanged(monkeypatch):
     raw = bytes.fromhex(sent["raw"].removeprefix("0x"))
     # The signed transaction is RLP; the calldata is what we can find inside it
     # by looking for the selector we know we produced.
-    selector = Web3.keccak(text="claim((uint256,uint256,uint64,bytes32),address,bytes,bytes32)")[:4]
+    selector = Web3.keccak(
+        text="claim((uint256,uint256,uint64,bytes32,address),bytes,"
+        "(address,bytes32,uint64),bytes)"
+    )[:4]
     start = raw.index(selector) + 4
-    sig, visitor, signature, nullifier = decode(
-        ["(uint256,uint256,uint64,bytes32)", "address", "bytes", "bytes32"],
+    sig, signature, attestation, attestation_signature = decode(
+        [
+            "(uint256,uint256,uint64,bytes32,address)",
+            "bytes",
+            "(address,bytes32,uint64)",
+            "bytes",
+        ],
         raw[start:],
     )
 
@@ -109,9 +119,17 @@ def test_the_signed_fields_reach_the_contract_unchanged(monkeypatch):
     assert sig[1] == A_CLAIM.nonce
     assert sig[2] == A_CLAIM.expiry
     assert "0x" + sig[3].hex() == A_CLAIM.geohash
-    assert visitor.lower() == A_CLAIM.visitor
+    # Inside the struct now, so the relay cannot redirect the payment without
+    # the merchant's signature failing to recover.
+    assert sig[4].lower() == A_CLAIM.visitor
     assert "0x" + signature.hex() == A_CLAIM.signature
-    assert "0x" + nullifier.hex() == A_CLAIM.nullifier_hash
+
+    # The contract reverts unless these two match, so the relay has to send the
+    # same address in both places — it never gets to choose one of them.
+    assert attestation[0].lower() == A_CLAIM.visitor
+    assert "0x" + attestation[1].hex() == A_CLAIM.nullifier_hash
+    assert attestation[2] == A_CLAIM.attestation_expiry
+    assert "0x" + attestation_signature.hex() == A_CLAIM.attestation_signature
 
 
 def test_a_claim_the_contract_would_reject_never_costs_gas(monkeypatch):

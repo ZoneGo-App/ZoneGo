@@ -237,6 +237,20 @@ contracts/    Solidity — on branch feat/contracts-skeleton
 docker compose up                    # then localhost:8000/docs
 ```
 
+Starts in **mock mode**: every endpoint answers from the sample campaigns around
+Delancey and Orchard, with no node, no index and no keys. That is deliberate —
+anyone cloning this can see the whole product working before touching a wallet.
+
+To point it at the chain, copy `.env.example` to `.env` and fill it in. `/ready`
+then reports what is wired and what is missing, which is a different question
+from `/health` — a service can be perfectly up and unable to pay anyone.
+
+| | |
+|---|---|
+| `GET /health` | The process answers. What an uptime check watches |
+| `GET /ready` | The node, the index and the keys. What a person debugging reads |
+| `GET /metrics` | Rejected claims grouped by reason, since the process started |
+
 <details>
 <summary>Without Docker</summary>
 
@@ -287,16 +301,76 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 9 endpoints, **78 tests** | Running |
-| Subgraph — schema, ABIs, manifest, mappings | Compiles; deploy pending contract addresses |
-| Contracts | Interfaces and events; logic in progress |
-| Public deployment | Pending |
+| API — 17 endpoints, **269 tests** | **Live** at `zonego-api.onrender.com` |
+| Subgraph — 10 entities across three contracts | **Deployed and answering** |
+| World ID 4.0 | Request signing live and pinned to World's own vectors; the end-to-end flow waits on the frontend |
+| Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |
+| Fraud model | Trains; live inference against the subgraph in progress |
+
+### Deployed
+
+**Base Sepolia**, block 46725201:
+
+```
+CampaignVault    0x7b4aaDDe248818bAD121431eAd1a3A865914c419
+VisitRegistry    0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e
+FraudOracle      0xfD18B748C0868C64d0bC5a68896CF3aF1d776243
+```
+
+For a week these addresses held an older build, and this section said so. They
+no longer do, and what replaced the confession is something checkable rather
+than a claim: read the bytecode yourself.
+
+```
+VisitRegistry.TRUSTED_ATTESTER()  0x73fD1ccA35A40d97147C187BeFC3Ea4c4317d5e3
+VisitRegistry.VAULT()             0x7b4aaDDe248818bAD121431eAd1a3A865914c419
+FraudOracle.OPERATOR()            0xB3B3386d89200Dea2400FA0afFB5e03621cbDE02
+```
+
+The attester is the address this API signs World attestations with, published
+at `/world/attester`, and the registry takes attestations from that address
+and no other. The operator is the only address `commitEpoch` accepts. Both are
+immutable in the contracts — which means the trust in this system is a pair of
+addresses anybody can read, not a promise in a README.
+
+**Subgraph**, live on Subgraph Studio:
+
+```
+https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
+```
+
+Everything the product shows about the past is read from that URL. Run the same
+queries and you get the same numbers — no database of ours sits in between.
+
+### One thing we say before anyone asks
+
+Selfie Check has no on-chain proof artifact. The World ID Router verifies Orb
+credentials only, and the v4 verifier is deployed on World Chain rather than
+Base, so `VisitRegistry` cannot ask World anything. Our backend asks instead and
+signs an attestation the contract trusts.
+
+That is a real trust assumption and it is the only one in the system: on this
+one fact, the contract believes us. Everywhere else the merchant signs and the
+chain decides. The attester address is published at `/world/attester` so the
+address the contract trusts can be checked against the one actually signing.
 
 **Known and deliberate:** the fraud model trains on synthetic data with four
 injected patterns. `ml/DATA.md` documents why they are synthetic, which fraud
 literature each pattern comes from, and how real data swaps in without
 changing the pipeline. A weakness you name first stops being an attack and
 becomes rigour.
+
+**Also known, and the next thing we would fix:** three things the API keeps in
+one process rather than in a shared store — the rate-limit counters, the
+in-memory note of which wallet a World nullifier was first attested for, and the
+epoch the hourly job last published. A second replica would keep its own copy of
+each, so the rate limit would double and a nullifier could be attested twice.
+
+None of the three is the last line of defence, which is why a hackathon week
+does not stand up Redis for them: the contract binds a nullifier to one wallet
+and refuses a second, and it refuses an epoch that is not greater than the one
+already committed. The process-local copies save a call, and the chain is what
+actually decides. At more than one replica that stops being a footnote.
 
 ---
 

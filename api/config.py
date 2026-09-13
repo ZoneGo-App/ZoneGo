@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,7 +19,16 @@ class Config(BaseSettings):
 
     # Seconds a subgraph answer is reused. Search and the merchant panel ask
     # for the same campaigns within the same second.
-    subgraph_cache_seconds: float = 5.0
+    #
+    # Thirty rather than five because Studio allows 3,000 queries a day and a
+    # five second window lets one query shape spend 720 of them an hour. A
+    # weekend of judges clicking around would exhaust the quota by lunchtime,
+    # and the endpoint that fails then is search — the front door.
+    #
+    # What it costs is that a campaign created or funded just now takes up to
+    # thirty seconds to appear in the list. Reading one campaign is unaffected:
+    # that route overlays the vault's answer on top of the index.
+    subgraph_cache_seconds: float = 30.0
     subgraph_timeout_seconds: float = 8.0
 
     # Comma separated. The deployed frontend lives on its own domain, so this
@@ -52,6 +62,110 @@ class Config(BaseSettings):
     # should not fail, and a photographed QR is still dead a minute later.
     qr_rotation_seconds: int = 30
     signature_ttl_seconds: int = 90
+
+    # --- World -------------------------------------------------------------
+    #
+    # Selfie Check cannot be verified on chain. The World ID Router only takes
+    # Orb credentials — `groupId` must be 1 — and the v4 verifier lives on World
+    # Chain, not Base. So the contract cannot ask World anything, and the only
+    # path is: our backend asks World, and then vouches for the answer.
+    #
+    # That vouching is a signature, and it costs something honest to say out
+    # loud: the contract trusts us on this one fact. Everywhere else in ZoneGo
+    # the merchant signs and the chain verifies, and we hold no authority. Here
+    # we do. It is World's protocol that forces it, and the video says so rather
+    # than hiding it.
+    world_app_id: str = ""
+    world_rp_id: str = ""
+    # Signs every proof request before IDKit will open it — World ID 4.0 refuses
+    # unsigned ones. Their documentation is blunt about it: never expose this to
+    # client-side code, which is why the signature comes from GET
+    # /world/rp-context and not from the widget.
+    world_rp_signing_key: str = ""
+    # Scopes what a person is proving. In World ID 4.0 it has to exist as an
+    # action in the Developer Portal, and the same string has to appear in three
+    # places: the portal, the IDKit widget, and the request this service signs.
+    world_action: str = "verify-visitor"
+    world_api_url: str = "https://developer.world.org/api/v4/verify"
+    world_timeout_seconds: float = 15.0
+    # How long a signed request stays openable. World's own default: long enough
+    # to scan a code and take a selfie, short enough that a context scraped off a
+    # page is dead before it is useful.
+    world_rp_request_ttl_seconds: int = 300
+
+    # Signs the attestation the contract verifies. A different key from the
+    # relay on purpose: leaking the relay costs gas, leaking this one lets
+    # somebody mint verified humans and drain a campaign.
+    attester_private_key: str = ""
+    # Two minutes assumed the attestation was signed and spent in one sitting.
+    # The real flow has a walk in the middle: someone verifies at home, closes
+    # the tab, walks fifteen minutes, and scans the QR at the counter. Two
+    # minutes died somewhere on the way, and the contract met them with
+    # AttestationExpired after they had already made the trip.
+    #
+    # An hour covers deciding, walking and scanning with room to spare, and it
+    # is still far inside the ninety days Selfie Check itself lasts.
+    #
+    # Longer buys nothing. VisitRegistry marks each attestation used the first
+    # time it is spent, so one that survives for days is still good for exactly
+    # one claim — a second visit needs a second selfie no matter how long this
+    # value is. Making people verify once a month instead of once a visit is a
+    # contract change, not a setting.
+    attestation_ttl_seconds: int = 3600
+    """
+    How long a Selfie Check keeps counting, in days.
+
+    The selfie and the attestation are different things, and conflating them is
+    what made this look impossible. World's verification is what proves a
+    human; our attestation is a signature naming one wallet, and the contract
+    burns it on first use. Nothing stops one selfie from backing several
+    attestations issued over time.
+
+    The chain already keeps the pairing: `nullifierBoundTo` is written on the
+    first claim and can never move, so a visitor with a nullifier on chain has
+    already proved this exact fact publicly. Reissuing an attestation for them
+    restates something anyone can verify rather than vouching for anything new.
+
+    Fifteen days, not the ninety Selfie Check itself lasts: the window is
+    measured from their last visit, and somebody who has not walked anywhere in
+    a fortnight can spare the ten seconds.
+    """
+    world_reverification_days: int = 15
+
+    # --- Epoch publication -------------------------------------------------
+    #
+    # Its own setting, holding the relay's key for now. Giving it a key of its
+    # own buys less than it sounds: both are read from one environment by one
+    # process, so whoever reads either reads both, and the blast radii people
+    # imagine for separate keys are not separate here.
+    #
+    # What sharing used to cost was the nonce: the relay and this job read the
+    # same next number and one send was lost. Both go through `api/sending.py`
+    # now, which counts the mempool and spends one nonce at a time per address,
+    # so a separate key is a value to change here and not code to write.
+    #
+    # The address is empty until the oracle is redeployed. The job runs the
+    # whole path either way and logs which half is missing.
+    fraud_oracle_address: str = "0x0000000000000000000000000000000000000000"
+    fraud_operator_private_key: str = ""
+
+    @field_validator("subgraph_url", "rpc_url", "world_api_url", mode="before")
+    @classmethod
+    def _trim(cls, value):
+        """A URL pasted into a dashboard field arrives with what came with it.
+
+        A trailing newline is the expensive one. httpx raises InvalidURL for it,
+        and InvalidURL does not inherit from httpx.HTTPError — so the handler
+        written to turn an upstream failure into a 502 does not catch it, and
+        every route that reads the index answers 500 instead. That is a
+        configuration typo wearing the costume of a broken service, and it cost
+        us an afternoon once already with the World signing key.
+
+        Quotes go too: a value copied with them is never meant to include them.
+        """
+        if isinstance(value, str):
+            return value.strip().strip('"').strip("'").strip()
+        return value
 
 
 @lru_cache

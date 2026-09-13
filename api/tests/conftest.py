@@ -13,7 +13,7 @@ after this and wins.
 
 import pytest
 
-from api import chain, epochs
+from api import chain, epochs, observability, ratelimit, world
 from api.config import get_config
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -26,6 +26,10 @@ def pinned_settings(monkeypatch):
     monkeypatch.setattr(config, "rpc_url", "")
     monkeypatch.setattr(config, "subgraph_url", "")
     monkeypatch.setattr(config, "relay_private_key", "")
+    monkeypatch.setattr(config, "attester_private_key", "")
+    monkeypatch.setattr(config, "world_rp_id", "")
+    monkeypatch.setattr(config, "world_app_id", "")
+    monkeypatch.setattr(config, "world_rp_signing_key", "")
     monkeypatch.setattr(config, "campaign_vault_address", ZERO_ADDRESS)
     monkeypatch.setattr(config, "visit_registry_address", ZERO_ADDRESS)
     # Node reads are memoised across calls, so a campaign cached by one test
@@ -33,6 +37,14 @@ def pinned_settings(monkeypatch):
     # worse: a root built under one test's wallets would be served to the next.
     chain.clear_cache()
     epochs.clear_cache()
+    # A nullifier bound in one test would refuse a different wallet in the next.
+    world.clear_bindings()
+    # Every test calls from the same client, so without this the twentieth one
+    # to touch a route gets a 429 for something the nineteenth did.
+    ratelimit.reset()
+    observability.reset_counters()
     yield
     chain.clear_cache()
     epochs.clear_cache()
+    world.clear_bindings()
+    ratelimit.reset()

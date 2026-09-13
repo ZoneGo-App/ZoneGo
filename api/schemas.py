@@ -1,6 +1,8 @@
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
+
+from api.points import unix_day
 
 
 class Campaign(BaseModel):
@@ -19,12 +21,45 @@ class Campaign(BaseModel):
     geohash: str
     radius_meters: int = Field(..., gt=0, le=2000)
     balance: int = Field(..., ge=0)
+    """
+    Whether a visitor can be paid for walking here right now: the campaign is
+    switched on *and* the balance still covers one reward. Not the same as the
+    index's own `active` flag, which only knows about the switch — a campaign
+    created and never funded is active by that measure and worthless by this
+    one. Search hides anything false, so this is what keeps an empty store off
+    the map.
+    """
     active: bool = True
     # Null when the answer came from the vault rather than the subgraph: the
     # contract holds no creation time, only an index knows when something
     # happened. Left empty instead of guessed, so a caller can tell which of
     # the two answered.
     created_at: datetime | None = None
+    """
+    The one day a week this store pays double, as a unix day number — the same
+    integer the contract compares, so no timezone can disagree about whether a
+    campaign was doubling.
+
+    Every store pays the same base reward. This is the only lever a merchant
+    has, and it is the same lever for all of them: one day, twice the reward.
+    A store cannot outbid the shop next door, which is the whole point — the
+    visitor picks a route by walking distance and by what they have not
+    discovered yet, not by who paid the most.
+
+    Null until the contract carries the field.
+    """
+    boost_day: int | None = None
+
+    @computed_field
+    @property
+    def pays_double_today(self) -> bool:
+        return self.boost_day is not None and self.boost_day == unix_day()
+
+    @computed_field
+    @property
+    def reward_today(self) -> int:
+        """What a visit is worth right now. This is the number to show."""
+        return self.reward_per_visit * 2 if self.pays_double_today else self.reward_per_visit
 
 
 class SearchHit(BaseModel):
@@ -34,6 +69,10 @@ class SearchHit(BaseModel):
 
 class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
+    # Inside the signed struct, so a payload is good for one person only. The
+    # merchant's screen can no longer hold a signature waiting for whoever
+    # walks up: the address has to arrive before the wallet signs.
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
 
 
 class LeaderboardEntry(BaseModel):
@@ -109,6 +148,23 @@ class ScoreResponse(BaseModel):
     top_features: list[FeatureWeight]
 
 
+class WorldAttestation(BaseModel):
+    """Our signature that World confirmed this wallet is a verified human.
+
+    Returned by `POST /world/verify` and carried straight into a claim, where
+    the contract recovers the signer and checks it against the attester address
+    it trusts. Defined above `ClaimRequest` because the claim carries one.
+    """
+
+    visitor: str
+    nullifier_hash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    "Unix seconds. Short — this is meant to be used in the same session."
+    expiry: int
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+    "The full EIP-712 document, so a caller can verify what was signed."
+    typed_data: dict
+
+
 class ClaimRequest(BaseModel):
     """Everything the visitor's phone read off the QR, plus who they are.
 
@@ -118,15 +174,23 @@ class ClaimRequest(BaseModel):
     """
 
     campaign_id: int = Field(..., ge=0)
+    # Comes back as a string from /qr/sign, and a string is what a JavaScript
+    # caller can send without rounding it. Accepted either way — the frontend
+    # should never have to convert a value it was handed.
     nonce: int = Field(..., ge=0)
     expiry: int = Field(..., gt=0)
     geohash: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
     signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
     visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
     world_proof: str = Field("", max_length=4096)
-    # What the contract actually stores: one human, not one wallet. It keys the
-    # weekly 100/50/25/0 curve, so two visitors sharing a nullifier would share
-    # a payout curve. Optional only while the samples stand in for the chain.
+    # What POST /world/verify handed back, forwarded whole. The contract reads
+    # the nullifier out of this struct, so it is how a claim says which human
+    # is claiming. Required against a real chain, absent against the samples —
+    # they have no World to ask.
+    attestation: WorldAttestation | None = None
+    # Kept for the sample mode, where nothing signs anything. Against a real
+    # chain the attestation above is the only source for this value — a claim
+    # carrying both is refused rather than quietly preferring one.
     nullifier_hash: str = Field("", pattern=r"^(0x[0-9a-fA-F]{64})?$")
 
 
@@ -136,6 +200,45 @@ class ClaimResponse(BaseModel):
     # False once the visitor has gas of their own and sends it themselves. The
     # relay is a convenience, never a requirement.
     relayed: bool = True
+
+
+class WorldVerifyRequest(BaseModel):
+    """What the phone got back from IDKit, plus who is claiming to be it."""
+
+    visitor: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
+    """
+    The IDKit response, forwarded to World untouched. Not modelled field by
+    field on purpose: World versions this payload — 3.0 legacy, 4.0 uniqueness,
+    4.0 session — and a schema of ours would reject a shape they added next
+    week. We relay the question; they decide whether it is well formed.
+    """
+    proof: dict
+
+
+class WorldRpContext(BaseModel):
+    """The signed half of an IDKit request, shaped the way IDKit takes it.
+
+    Passed to the widget as `rp_context` without renaming a field: World checks
+    the signature over exactly these values.
+    """
+
+    rp_id: str
+    # A field element, 0x-prefixed. Single use: ask again for every request.
+    nonce: str = Field(..., pattern=r"^0x[0-9a-fA-F]{64}$")
+    created_at: int
+    expires_at: int
+    # 65 bytes, r || s || v, over the message World defines.
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+
+
+class WorldRequest(BaseModel):
+    """Everything the frontend needs to open IDKit, from one call."""
+
+    app_id: str
+    # The action IDKit has to be opened with. The signature covers it, so a
+    # widget opened with any other action is refused by World.
+    action: str
+    rp_context: WorldRpContext
 
 
 class EpochWindow(BaseModel):
@@ -188,6 +291,9 @@ class QrSignResponse(BaseModel):
     # The full EIP-712 document the merchant wallet signs. Handed over as-is so
     # the frontend passes it straight to the wallet without rebuilding it.
     typed_data: dict
-    nonce: int
+    # A decimal string, not a number: a 64-bit nonce is past what a JavaScript
+    # number holds exactly, and `JSON.parse` rounds it without saying so. The
+    # wallet would then sign a nonce that was never issued.
+    nonce: str
     expiry: int
     rotate_after_seconds: int

@@ -47,15 +47,15 @@ TypeScript y consultas, no Solidity.
 ### Cadena — Base Sepolia, bloques 46522139–46522140
 
 ```
-CampaignVault    0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0
-VisitRegistry    0xD33f2e26f11Fe011835D791EbA1BFE123479998A
-FraudOracle      0x5157504d3a9683Ca953EF5db1255dE619E110A9B
+CampaignVault    0x7b4aaDDe248818bAD121431eAd1a3A865914c419
+VisitRegistry    0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e
+FraudOracle      0xfD18B748C0868C64d0bC5a68896CF3aF1d776243
 ```
 
 ### Subgraph — desplegado y consultable
 
 ```
-https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.1
+https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
 ```
 
 ### Ramas
