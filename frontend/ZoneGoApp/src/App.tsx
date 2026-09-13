@@ -151,6 +151,7 @@ function App() {
         <MerchantProfileForm
           merchantAddress={merchantAddress}
           initialProfile={merchantProfile}
+          onBack={merchantProfile ? () => setEditingProfile(false) : undefined}
           onComplete={(profile) => {
             setMerchantProfile(profile)
             setEditingProfile(false)
@@ -191,9 +192,10 @@ function App() {
     )
   } else if (!visitorProfile || editingProfile) {
     content = (
-      <VisitorProfileForm
+     <VisitorProfileForm
         visitorAddress={visitorAddress}
         initialProfile={visitorProfile}
+        onBack={visitorProfile ? () => setEditingProfile(false) : undefined}
         onComplete={(profile) => {
           setVisitorProfile(profile)
           setEditingProfile(false)

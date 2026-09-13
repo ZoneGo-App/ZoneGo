@@ -66,8 +66,12 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
 
   return (
     <div className="min-h-screen bg-bg px-4 py-6">
-      <button type="button" onClick={onBack} className="mb-4 text-sm text-ink-muted">
-        &larr; Back
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-4 flex w-fit items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-ink"
+      >
+        <span aria-hidden="true">&larr;</span> Back
       </button>
 
       <div className="text-center">
