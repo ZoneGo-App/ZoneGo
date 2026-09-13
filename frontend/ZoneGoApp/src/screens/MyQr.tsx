@@ -92,7 +92,7 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <QRCodeSVG
               value={JSON.stringify({ message: signed.typed_data.message, attestation })}
-              size={220}
+              size={320}
             />
           </div>
         )}
