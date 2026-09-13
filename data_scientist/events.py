@@ -1,10 +1,10 @@
 """
 Canonical visit-event schema for ZoneGo's fraud pipeline.
 
-The whole point of freezing this schema (Día 1 of the plan) is that
+The whole point of freezing this schema (Day 1 of the plan) is that
 `build_features()` in train.py never has to change when the data source
 changes. Today the only loader is the synthetic CSV; once Lucio's subgraph
-(Día 4) is live, `load_events_from_subgraph()` becomes the real loader and
+(Day 4) is live, `load_events_from_subgraph()` becomes the real loader and
 nothing downstream is touched, because both return the exact same columns.
 """
 
@@ -193,11 +193,12 @@ def load_events_from_subgraph(
     breaks same-timestamp ties in `id` order — true by construction (id is
     part of the ORDER BY specifically to make cursor pagination
     deterministic), and confirmed against a 3,500-row / 1,500-way-tie test
-    scenario, but not yet confirmed against real indexed visits (the
-    deployed subgraph has 0 so far — campaign 1 at Delancey is indexed,
-    visits aren't, pending the contracts redeploy). Re-check this once real
-    visits exist; if graph-node's tie-breaking ever differed, `id_gt`
-    dropping true duplicates is the failure mode to watch for.
+    scenario, but not yet confirmed against real indexed visits. UPDATE:
+    campaign 1 at Delancey (geohash dr5rsked, same coordinates generate.py
+    uses) is now indexed and funded with $20 — visits are still at zero,
+    pending the first one from Sebas. Once that lands, re-check this
+    assumption directly; if graph-node's tie-breaking ever differed,
+    `id_gt` dropping true duplicates is the failure mode to watch for.
     """
     rows = []
     skipped = 0
