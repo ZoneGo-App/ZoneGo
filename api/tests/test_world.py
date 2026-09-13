@@ -260,3 +260,69 @@ def test_a_malformed_visitor_never_reaches_world():
     assert client.post(
         "/world/verify", json={"visitor": "0x1", "proof": A_PROOF}
     ).status_code == 422
+
+
+# --- the selfie you do not have to repeat -----------------------------------
+#
+# Selfie Check is not what the contract burns — our signature is. Someone who
+# claimed last week already wrote their nullifier into VisitRegistry, where it
+# cannot move to another wallet, so signing again restates a public fact rather
+# than vouching for a new one. These guard the fence around that.
+
+
+def standing_is(monkeypatch, value):
+    from api import subgraph
+
+    def fake(visitor):
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    monkeypatch.setattr(subgraph, "visitor_standing", fake)
+
+
+def test_a_recent_visitor_is_attested_without_another_selfie(live, monkeypatch):
+    standing_is(monkeypatch, (NULLIFIER, int(time.time()) - 3 * 86_400))
+
+    r = client.get(f"/world/attestation/{VISITOR}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["visitor"] == VISITOR
+    assert body["nullifier_hash"] == NULLIFIER
+    assert body["expiry"] > int(time.time())
+
+
+def test_a_wallet_the_chain_never_saw_still_needs_the_selfie(live, monkeypatch):
+    standing_is(monkeypatch, None)
+    assert client.get(f"/world/attestation/{OTHER}").status_code == 404
+
+
+def test_a_visit_older_than_the_window_needs_the_selfie_again(live, monkeypatch):
+    config = get_config()
+    monkeypatch.setattr(config, "world_reverification_days", 15)
+    standing_is(monkeypatch, (NULLIFIER, int(time.time()) - 16 * 86_400))
+
+    r = client.get(f"/world/attestation/{VISITOR}")
+    assert r.status_code == 404
+    assert "15 days" in r.json()["detail"]
+
+
+def test_an_unreachable_index_is_not_read_as_never_verified(live, monkeypatch):
+    """502, not 404.
+
+    "We could not ask" and "they have never verified" send the frontend down
+    different paths, and only one of them should cost somebody a selfie.
+    """
+    from api import subgraph
+
+    standing_is(monkeypatch, subgraph.SubgraphError("studio is down"))
+    assert client.get(f"/world/attestation/{VISITOR}").status_code == 502
+
+
+def test_a_malformed_address_is_refused_before_asking_anything(live, monkeypatch):
+    assert client.get("/world/attestation/not-an-address").status_code == 422
+
+
+def test_mock_mode_refuses_rather_than_inventing_a_signature(monkeypatch):
+    monkeypatch.setattr(get_config(), "mock_mode", True)
+    assert client.get(f"/world/attestation/{VISITOR}").status_code == 501

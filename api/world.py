@@ -203,9 +203,10 @@ def build_typed_data(*, visitor: str, nullifier_hash: str, expiry: int) -> dict:
 def attest(*, visitor: str, nullifier_hash: str) -> Attestation:
     """Sign that World confirmed this wallet belongs to a verified human.
 
-    Short-lived on purpose. The attestation travels from this response into a
-    claim in the same session, so two minutes is generous — and one read off a
-    screen is already worthless by the time anyone could use it.
+    Short-lived on purpose. The attestation has to survive the walk between
+    verifying and reaching the counter, and nothing longer: it names one wallet
+    and the contract burns it on first use, so one read off a screen buys an
+    attacker a claim that pays the person they took it from.
     """
     config = get_config()
     if not config.attester_private_key:

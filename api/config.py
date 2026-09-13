@@ -97,10 +97,40 @@ class Config(BaseSettings):
     # relay on purpose: leaking the relay costs gas, leaking this one lets
     # somebody mint verified humans and drain a campaign.
     attester_private_key: str = ""
-    # An attestation is carried to the contract by the same person it names, in
-    # the same session. Two minutes is long enough for a slow phone and short
-    # enough that one intercepted off a screen is already dead.
-    attestation_ttl_seconds: int = 120
+    # Two minutes assumed the attestation was signed and spent in one sitting.
+    # The real flow has a walk in the middle: someone verifies at home, closes
+    # the tab, walks fifteen minutes, and scans the QR at the counter. Two
+    # minutes died somewhere on the way, and the contract met them with
+    # AttestationExpired after they had already made the trip.
+    #
+    # An hour covers deciding, walking and scanning with room to spare, and it
+    # is still far inside the ninety days Selfie Check itself lasts.
+    #
+    # Longer buys nothing. VisitRegistry marks each attestation used the first
+    # time it is spent, so one that survives for days is still good for exactly
+    # one claim — a second visit needs a second selfie no matter how long this
+    # value is. Making people verify once a month instead of once a visit is a
+    # contract change, not a setting.
+    attestation_ttl_seconds: int = 3600
+    """
+    How long a Selfie Check keeps counting, in days.
+
+    The selfie and the attestation are different things, and conflating them is
+    what made this look impossible. World's verification is what proves a
+    human; our attestation is a signature naming one wallet, and the contract
+    burns it on first use. Nothing stops one selfie from backing several
+    attestations issued over time.
+
+    The chain already keeps the pairing: `nullifierBoundTo` is written on the
+    first claim and can never move, so a visitor with a nullifier on chain has
+    already proved this exact fact publicly. Reissuing an attestation for them
+    restates something anyone can verify rather than vouching for anything new.
+
+    Fifteen days, not the ninety Selfie Check itself lasts: the window is
+    measured from their last visit, and somebody who has not walked anywhere in
+    a fortnight can spare the ten seconds.
+    """
+    world_reverification_days: int = 15
 
     # --- Epoch publication -------------------------------------------------
     #

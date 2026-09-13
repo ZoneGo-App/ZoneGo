@@ -54,6 +54,22 @@ query Campaign($id: Bytes!) {{
 }}
 """
 
+# What the chain already knows about one visitor: which human they proved to
+# be, and when they last walked anywhere. Both come from `VisitRegistry` — the
+# nullifier is written on their first claim and cannot move afterwards — so
+# this asks the index to repeat a fact rather than to be trusted with one.
+VISITOR_STANDING = """
+query VisitorStanding($id: Bytes!) {
+  visitor(id: $id) {
+    id
+    nullifierHash
+    visits(first: 1, orderBy: timestamp, orderDirection: desc) {
+      timestamp
+    }
+  }
+}
+"""
+
 # Everyone who was seen inside one epoch. Ordered by timestamp so the page we
 # take is the earliest slice of the window rather than an arbitrary one — an
 # epoch has to be rebuildable to the same root by anyone who asks.
@@ -155,6 +171,31 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
 def list_campaigns(first: int = 100) -> list[Campaign]:
     data = run(LIST_CAMPAIGNS, {"first": first})
     return [to_campaign(node) for node in data.get("campaigns", [])]
+
+
+def visitor_standing(visitor: str) -> tuple[str, int] | None:
+    """The nullifier this wallet is bound to, and when it last claimed.
+
+    Returns None when the chain has never seen them prove anything — no
+    visitor, or a visitor with no nullifier yet — which is the case that has to
+    go through Selfie Check rather than around it.
+
+    The timestamp is the last visit rather than the moment they verified,
+    because we keep no record of the second and the chain keeps the first.
+    Today every claim carries a fresh attestation, so the two are the same
+    instant; if that ever stops being true this reads older than reality, which
+    is the safe direction — it asks for a selfie sooner, never later.
+    """
+    node = run(VISITOR_STANDING, {"id": visitor.lower()}).get("visitor")
+    if not node:
+        return None
+
+    nullifier = node.get("nullifierHash")
+    visits = node.get("visits") or []
+    if not nullifier or not visits:
+        return None
+
+    return nullifier, int(visits[0]["timestamp"])
 
 
 def get_campaign(campaign_id: int) -> Campaign | None:
