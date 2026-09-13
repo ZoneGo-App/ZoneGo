@@ -229,20 +229,6 @@ export function Search({ onSelectCampaign }: SearchProps) {
         </p>
       )}
 
-      {/* A real location with nothing in reach, or one the browser refused:
-          either way the way back to the live campaigns is one tap. */}
-      {useRealLocation && (nothingInRange || !!locationError) && (
-        <div className="mt-4 text-center">
-          <button
-            type="button"
-            onClick={switchToDelancey}
-            className="rounded-full bg-brand px-5 py-2 text-sm font-medium text-white"
-          >
-            See the stores on Delancey Street
-          </button>
-        </div>
-      )}
-
       <ul className="mt-4 flex flex-col gap-3">
         {results.map((hit) => {
           const isBoosted = hit.campaign.pays_double_today

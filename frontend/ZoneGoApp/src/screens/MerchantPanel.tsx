@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { usePrivy, useSendTransaction } from '@privy-io/react-auth'
 import { fetchCampaigns, formatUsd, type Campaign } from '../lib/api'
 import { useRole } from '../context/RoleContext'
@@ -8,6 +8,8 @@ import {
   BASE_SEPOLIA_CHAIN_ID,
   encodeApprove,
   encodeFund,
+  encodeCreateCampaign,
+  encodeGeohash,
   usdToMicroUsdc,
 } from '../lib/contracts'
 
@@ -18,6 +20,71 @@ interface MerchantPanelProps {
 // createCampaign(rewardPerVisit=50000, dailyCap=50, geohash="dr5rsked", radius=120)
 const SEED_CAMPAIGN_CALLDATA =
   '0x4247c05a000000000000000000000000000000000000000000000000000000000000c350000000000000000000000000000000000000000000000000000000000000003264723572736b65640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078'
+
+function CreateCampaignButton({ merchantAddress, onCreated }: { merchantAddress: string; onCreated: () => void }) {
+  const { sendTransaction } = useSendTransaction()
+  const [status, setStatus] = useState<'idle' | 'locating' | 'sending' | 'error'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCreate() {
+    setError(null)
+    setStatus('locating')
+
+    if (!('geolocation' in navigator)) {
+      setStatus('error')
+      setError("This browser can't share your location.")
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          setStatus('sending')
+          const geohash = encodeGeohash(pos.coords.latitude, pos.coords.longitude)
+          // Same reward/cap/radius as the Delancey demo campaign — a real
+          // "set your own economics" form is a fast follow, not today's fix.
+          await sendTransaction(
+            {
+              to: CAMPAIGN_VAULT_ADDRESS,
+              chainId: BASE_SEPOLIA_CHAIN_ID,
+              data: encodeCreateCampaign(50_000n, 50n, geohash, 120n),
+            },
+            { address: merchantAddress },
+          )
+          setStatus('idle')
+          onCreated()
+        } catch (err) {
+          setStatus('error')
+          setError(err instanceof Error ? err.message : 'Creating the campaign failed')
+        }
+      },
+      () => {
+        setStatus('error')
+        setError("Couldn't get your location. Turn on location and try again.")
+      },
+    )
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-brand/30 bg-brand/10 p-4 text-center">
+      <p className="mb-2 text-sm text-ink">
+        Create your campaign right where you are — neighbors searching near your
+        real location will find it.
+      </p>
+      <button
+        type="button"
+        onClick={handleCreate}
+        disabled={status === 'locating' || status === 'sending'}
+        className="rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white transition disabled:opacity-50"
+      >
+        {status === 'locating' && 'Finding your location...'}
+        {status === 'sending' && 'Creating...'}
+        {(status === 'idle' || status === 'error') && 'Create campaign at my location'}
+      </button>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
+  )
+}
 
 function SeedCampaignButton({ merchantAddress }: { merchantAddress: string }) {
   const { sendTransaction } = useSendTransaction()
@@ -159,22 +226,30 @@ export function MerchantPanel({ merchantAddress }: MerchantPanelProps) {
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // A campaign just created on-chain doesn't appear here instantly — the
+  // backend indexer has to catch up first. Rather than one silent fetch
+  // right after, this retries a few times over ~20s so "Create campaign"
+  // resolves into the real panel without the merchant needing to refresh
+  // by hand.
+  const [waitingForIndex, setWaitingForIndex] = useState(false)
 
-  useEffect(() => {
+  const loadCampaign = useCallback(() => {
     let cancelled = false
 
     fetchCampaigns()
       .then((campaigns) => {
-        if (cancelled) return
+        if (cancelled) return null
         const mine = campaigns.find(
           (c) => c.merchant.toLowerCase() === merchantAddress.toLowerCase(),
         )
         setCampaign(mine ?? null)
+        return mine ?? null
       })
       .catch((err) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Could not load your campaign')
         }
+        return null
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -184,6 +259,36 @@ export function MerchantPanel({ merchantAddress }: MerchantPanelProps) {
       cancelled = true
     }
   }, [merchantAddress])
+
+  useEffect(() => loadCampaign(), [loadCampaign])
+
+  function handleCampaignCreated() {
+    setWaitingForIndex(true)
+    let attempts = 0
+    const interval = setInterval(() => {
+      attempts += 1
+      fetchCampaigns()
+        .then((campaigns) => {
+          const mine = campaigns.find(
+            (c) => c.merchant.toLowerCase() === merchantAddress.toLowerCase(),
+          )
+          if (mine) {
+            setCampaign(mine)
+            setWaitingForIndex(false)
+            clearInterval(interval)
+          } else if (attempts >= 6) {
+            // Still not indexed after ~18s — stop polling silently rather
+            // than forever; the merchant can reopen this tab later.
+            setWaitingForIndex(false)
+            clearInterval(interval)
+          }
+        })
+        .catch(() => {
+          // A transient fetch error here shouldn't cancel the whole retry
+          // loop — just skip this attempt and try again next tick.
+        })
+    }, 3000)
+  }
 
   if (loading) {
     return (
@@ -206,8 +311,15 @@ export function MerchantPanel({ merchantAddress }: MerchantPanelProps) {
       <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-bg px-6 text-center">
         <p className="text-ink">You don't have a campaign yet.</p>
         <p className="text-sm text-ink-muted">
-          Campaign setup isn't built yet — check back soon.
+          Create one to start paying real visitors who walk in.
         </p>
+        {waitingForIndex ? (
+          <p className="mt-4 text-sm text-ink-muted">
+            Campaign sent — waiting for it to show up here...
+          </p>
+        ) : (
+          <CreateCampaignButton merchantAddress={merchantAddress} onCreated={handleCampaignCreated} />
+        )}
         {import.meta.env.DEV && <SeedCampaignButton merchantAddress={merchantAddress} />}
       </div>
     )
