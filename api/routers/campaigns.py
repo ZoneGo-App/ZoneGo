@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from api import chain, subgraph
+from api import chain, profiles, subgraph
 from api.config import get_config
 from api.mock_data import CAMPAIGNS
 from api.schemas import Campaign
@@ -11,16 +11,18 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 def _from_chain(onchain: chain.OnChainCampaign) -> Campaign:
     """What the vault holds, shaped like a Campaign.
 
-    Three fields the contract does not have: the merchant's name and what they
-    stock are off-chain metadata, and the creation time is something only an
-    index knows. They come back empty rather than invented.
+    Three fields the contract does not have. The merchant's name and what they
+    stock come from the profile they signed, if they signed one; the creation
+    time is something only an index knows, so it stays empty rather than
+    invented.
     """
+    name, sells = profiles.labels(onchain.merchant)
     return Campaign(
         campaign_id=onchain.campaign_id,
         merchant=onchain.merchant,
-        merchant_name=f"Merchant {onchain.merchant[:6]}…{onchain.merchant[-4:]}",
+        merchant_name=name,
         category="",
-        sells="",
+        sells=sells,
         reward_per_visit=onchain.reward_per_visit,
         daily_cap=onchain.daily_cap or 1,
         lat=onchain.lat,

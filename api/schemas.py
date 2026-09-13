@@ -67,6 +67,29 @@ class SearchHit(BaseModel):
     distance_meters: int = Field(..., ge=0)
 
 
+class MerchantProfileRequest(BaseModel):
+    """A store's name and description, signed by the wallet that owns the store.
+
+    `signature` is an EIP-191 personal_sign over the text returned by
+    `api.profiles.message`, with the same four values sent here. Without it
+    anyone could rename somebody else's store.
+    """
+
+    wallet: str = Field(..., pattern=r"^0x[0-9a-fA-F]{40}$")
+    name: str = Field(..., min_length=1, max_length=120)
+    description: str = Field("", max_length=400)
+    "Unix seconds when the merchant signed. Must be close to now, and newer than the last save."
+    issued_at: int = Field(..., gt=0)
+    signature: str = Field(..., pattern=r"^0x[0-9a-fA-F]{130}$")
+
+
+class MerchantProfile(BaseModel):
+    wallet: str
+    name: str
+    description: str
+    issued_at: int
+
+
 class QrSignRequest(BaseModel):
     campaign_id: int = Field(..., ge=0)
     # Inside the signed struct, so a payload is good for one person only. The

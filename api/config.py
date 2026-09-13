@@ -149,6 +149,21 @@ class Config(BaseSettings):
     fraud_oracle_address: str = "0x0000000000000000000000000000000000000000"
     fraud_operator_private_key: str = ""
 
+    # --- Merchant profiles -------------------------------------------------
+    #
+    # Where store names and descriptions are kept. Empty means a file in the
+    # system temp directory, which is the one place the container can write:
+    # it runs as an unprivileged user and /app belongs to root, so a database
+    # beside the code would fail with PermissionError on the first save.
+    #
+    # On a free Render instance that file does not survive a redeploy or the
+    # instance sleeping. Point this at a mounted disk to keep profiles.
+    merchant_profiles_path: str = ""
+    # How far a profile signature's timestamp may sit from our clock. Long
+    # enough for a slow phone and a skewed clock; short enough that a signed
+    # request captured off the network is dead before it is worth replaying.
+    merchant_profile_signature_window_seconds: int = 600
+
     @field_validator("subgraph_url", "rpc_url", "world_api_url", mode="before")
     @classmethod
     def _trim(cls, value):

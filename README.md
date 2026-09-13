@@ -301,7 +301,7 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 17 endpoints, **269 tests** | **Live** at `zonego-api.onrender.com` |
+| API — 20 endpoints, **290 tests** | **Live** at `zonego-api.onrender.com` |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
 | World ID 4.0 | Request signing live and pinned to World's own vectors; the end-to-end flow waits on the frontend |
 | Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |

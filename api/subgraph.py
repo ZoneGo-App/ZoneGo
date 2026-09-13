@@ -13,6 +13,7 @@ from typing import Any
 
 import httpx
 
+from api import profiles
 from api.config import get_config
 from api.eip712 import geohash_from_bytes32
 from api.geo import decode_geohash
@@ -138,15 +139,16 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
     merchant = node["merchant"]["id"]
     balance = int(node["balance"])
     reward = int(node["rewardPerVisit"])
+    # The chain has no name for a store. The merchant can sign one, and if
+    # they have, it replaces the shortened address here and becomes searchable.
+    name, sells = profiles.labels(merchant)
 
     return Campaign(
         campaign_id=int(node["campaignId"]),
         merchant=merchant,
-        # Off-chain metadata does not exist yet, so the address stands in. A
-        # placeholder is better than an empty string, which the model rejects.
-        merchant_name=f"Merchant {merchant[:6]}…{merchant[-4:]}",
+        merchant_name=name,
         category="",
-        sells="",
+        sells=sells,
         reward_per_visit=reward,
         daily_cap=int(node["dailyCap"]) or 1,
         lat=lat,

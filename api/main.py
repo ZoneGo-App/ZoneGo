@@ -13,6 +13,7 @@ from api.routers import (
     epochs,
     health,
     leaderboard,
+    merchants,
     qr,
     score,
     search,
@@ -102,3 +103,4 @@ app.include_router(score.router)
 app.include_router(leaderboard.router)
 app.include_router(epochs.router)
 app.include_router(world.router)
+app.include_router(merchants.router)

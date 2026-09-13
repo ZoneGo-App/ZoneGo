@@ -20,9 +20,13 @@ ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 
 @pytest.fixture(autouse=True)
-def pinned_settings(monkeypatch):
+def pinned_settings(monkeypatch, tmp_path):
     config = get_config()
     monkeypatch.setattr(config, "mock_mode", True)
+    # Profiles live in a file, and a file outlives a test. Each test gets its
+    # own, so a store named in one cannot show up renamed in the next — and
+    # nothing a test saves ever lands in the real one.
+    monkeypatch.setattr(config, "merchant_profiles_path", str(tmp_path / "profiles.db"))
     monkeypatch.setattr(config, "rpc_url", "")
     monkeypatch.setattr(config, "subgraph_url", "")
     monkeypatch.setattr(config, "relay_private_key", "")
