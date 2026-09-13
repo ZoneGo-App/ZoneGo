@@ -1,0 +1,24 @@
+# requirements.txt — ZoneGo fraud pipeline
+#
+# pip install -r requirements.txt
+#
+# EXACT versions (==), not ">=": a .joblib serializes internal
+# pandas/sklearn/numpy objects, and those internal formats change between
+# versions. That's also why NO .joblib is committed to the repo — it gets
+# regenerated on each machine with `python3 train.py` (~40s), and the
+# compatibility problem disappears entirely instead of just being mitigated.
+pandas==3.0.2
+numpy==2.4.4
+scikit-learn==1.8.0
+joblib==1.5.3
+requests==2.33.1
+
+# fastapi/uvicorn (only needed for score.py, the API): pin these two with
+# == after installing once, same criterion as above.
+fastapi>=0.110
+uvicorn>=0.29
+
+# --------------------------------------------------------------------
+# How to regenerate fraud_model.joblib (not in the repo, on purpose):
+#   python3 generate.py   # creates visits.csv (~20,000 rows, a few seconds)
+#   python3 train.py      # trains and saves fraud_model.joblib (~40 seconds)
