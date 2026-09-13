@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { saveMerchantProfile, type MerchantProfile } from '../lib/profile'
+import { saveMerchantProfileRemote } from '../lib/api'
 
 interface MerchantProfileFormProps {
   merchantAddress: string
@@ -29,6 +30,14 @@ export function MerchantProfileForm({
       description: description.trim(),
     }
     saveMerchantProfile(merchantAddress, profile)
+    // Best-effort — see saveMerchantProfileRemote's docstring. Doesn't
+    // block onComplete either way, since the endpoint doesn't exist on
+    // the backend yet.
+    saveMerchantProfileRemote({
+      wallet: merchantAddress,
+      name: profile.name,
+      description: profile.description,
+    })
     onComplete(profile)
   }
 

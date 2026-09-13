@@ -31,7 +31,7 @@ type MerchantTab = 'scan' | 'panel' | 'ranking'
 /**
  * Reads a previously stored attestation, but only if it hasn't expired.
  * The attestation itself carries a TTL set server-side (originally 120s,
- * pending an extension from Lucio) — an expired one sitting in storage
+* pending an extension) — an expired one sitting in storage 
  * would just fail on chain, so there is no point handing it back to the UI
  * as if it were still usable. Uses localStorage (not sessionStorage) so it
  * survives closing the tab or the app — but as long as the server-side TTL

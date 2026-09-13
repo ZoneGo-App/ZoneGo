@@ -5,7 +5,7 @@ import { formatUsd } from '../lib/api'
 const ATTESTATION_STORAGE_KEY = 'zonego_attestation'
 
 interface MyPanelProps {
-  // Wired to real values once Lucio exposes an endpoint for a visitor's
+   // Wired to real values once Lucio exposes an endpoint for a visitor's
   // earnings/visit history. Until then this always renders as zero/empty —
   // that is the true current state (zero real visits exist system-wide),
   // not a placeholder standing in for numbers we haven't built yet.

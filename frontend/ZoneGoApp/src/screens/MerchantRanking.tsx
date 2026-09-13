@@ -1,5 +1,5 @@
 interface MerchantRankingProps {
-  // Wired to real values once Lucio adds a campaign_id filter to
+    // Wired to real values once a campaign_id filter is added to
   // /leaderboard. Until then this always renders empty — there is no way
   // to know today which explorers visited this specific store most.
   topVisitors?: { label: string; visits: number }[]

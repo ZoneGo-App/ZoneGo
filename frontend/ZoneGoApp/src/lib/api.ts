@@ -266,3 +266,35 @@ export async function fetchMyStanding(params: {
   }
   return res.json()
 }
+
+/**
+ * Saves the merchant's real name/description to the backend, so /campaigns
+ * and /search can show it instead of the generic "Merchant 0x..." fallback.
+ * This endpoint doesn't exist on the API yet — calling it will 404 until
+* that endpoint gets built. That's expected: this call is
+ * best-effort and never throws, so the local profile save (localStorage)
+ * keeps working exactly as it does today regardless of whether the backend
+ * call succeeds. Once the endpoint is live, campaigns will pick up the
+ * real name automatically with no other change needed here.
+ */
+export async function saveMerchantProfileRemote(params: {
+  wallet: string
+  name: string
+  description: string
+}): Promise<void> {
+  try {
+    const url = new URL('/merchants/profile', API_BASE_URL)
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        wallet: params.wallet,
+        name: params.name,
+        description: params.description,
+      }),
+    })
+  } catch {
+    // Best-effort — see docstring. Network errors or a 404 (endpoint not
+    // built yet) are both fine to swallow here.
+  }
+}
