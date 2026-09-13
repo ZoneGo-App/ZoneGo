@@ -31,10 +31,11 @@ Delancey Bodega comes back. **Google files it as a convenience store and
 would never show it for "sneakers"** — the owner knows better, and told us.
 
 ```
-POST /qr/sign        { "campaign_id": 1 }
+POST /qr/sign        { "campaign_id": 1, "visitor": "0x7A3c9E1b4D2f5A8c6B0e9F7d3C1a5B8e2D4f6A90" }
 ```
 
-That is the EIP-712 payload the merchant signs. Look at what it does **not**
+That is the EIP-712 payload the merchant signs. The visitor's address is inside
+it, so a signature is good for one person only. Look at what it does **not**
 contain: our server's signature. It never signs.
 
 ```
@@ -97,19 +98,25 @@ Three parties who do not trust each other, coordinating only through code.
 |---|---|---|
 | **Merchant** | USDC per verified visit | A person inside their store |
 | **Visitor** | A walk | USDC instantly — no signup, no card, no seed phrase |
-| **Protocol** | Infrastructure and indexing | 5% fee, and never custody of the budget |
+| **Protocol** | Infrastructure and indexing | No fee in this build, and never custody of the budget |
 
-1. The merchant funds a campaign and sets reward, daily cap, geohash, radius.
+1. The merchant creates a campaign — reward, daily cap, geohash, radius — and
+   funds it with USDC.
 2. A visitor searches for `sneakers` within 1, 5 or 10 km.
 3. They walk there. The merchant's screen shows a QR carrying an EIP-712
    signature, redrawn every 30 seconds.
-4. The visitor submits it. The contract verifies and pays from the vault.
-5. The subgraph indexes the event. The fraud model reads the subgraph and
-   decides whether the payout is released or **held**.
+4. The visitor submits it. The contract verifies and pays from the vault, in
+   the same transaction.
+5. The subgraph indexes the visit, and the fraud model reads it from there.
 
-That last word is why `VisitRecorded` and `RewardPaid` are separate events.
-Between them lives the held state — score after the money is gone and the
-model decides nothing.
+**What is not wired yet, said plainly:** the fraud model does not stop a
+payout. The contract pays inside `claim()`, before any score exists, and
+`VisitRegistry` never consults `FraudOracle`. The model scores visits after the
+fact, off chain, and the API commits scores per epoch as a Merkle root — but the
+score the API serves today is a deterministic placeholder, not the trained
+model, and no epoch has been committed because there are no visits to score.
+Holding a payout until its score clears is the next contract change, not a
+feature of this one.
 
 ---
 
@@ -120,12 +127,12 @@ meets them:
 
 | The attack | The gate |
 |---|---|
-| A thousand wallets, one human | Payment settles against the World ID nullifier, not the wallet |
-| The same human in a loop | Payment decays **100 / 50 / 25 / 0** per week at the same store, counted by the contract |
-| Claiming twice in a day | Points and payment both need a different day at that store |
+| A thousand wallets, one human | The World ID nullifier is bound to the first wallet that claims with it, and the contract rejects it from any other |
+| The same human in a loop | Payment decays **100 / 50 / 25 / 0** per week at the same store, counted by the contract against the nullifier |
+| Claiming twice in a day | A second visit to the same store on the same day scores no points, and pays less — the weekly decay counts it like any other visit |
 | A photographed QR, reused | Single-use nonce, signature dead after 90 seconds |
-| Draining a campaign at once | Daily cap, set by the merchant when funding |
-| A fraud score nobody can audit | Scores committed on chain as a **Merkle root per epoch** — we cannot rewrite one afterwards to justify a charge |
+| Draining a campaign at once | Daily cap on visits, set by the merchant when creating the campaign |
+| A fraud score nobody can audit | Built to commit each epoch's scores on chain as a **Merkle root** to `FraudOracle`, so one cannot be rewritten afterwards. No epoch is committed yet — see *What is not wired yet* above |
 
 ---
 
@@ -166,13 +173,16 @@ Each integration, with the file to open.
 one way to die: one person with a hundred wallets emptying a campaign in an
 hour. Selfie Check turns *a wallet* into *a person*.
 
-The nullifier binds to the visitor's Privy wallet and is stored in
-`VisitRegistry`. The contract rejects a second claim from the same nullifier
-in the same campaign inside the window — **risk and eligibility, which is
-literally what the prize asks for**, not a login button.
+The nullifier binds to the first Privy wallet that claims with it, in
+`VisitRegistry`, and the contract rejects that nullifier from any other wallet.
+Payment for the same human at the same store then decays by the week. **An
+abuse-prevention and eligibility signal, which is literally what the prize asks
+for**, not a login button.
 
-`subgraph/schema.graphql` → `Visitor.nullifierHash`
-`api/routers/visits.py` → the claim path
+`api/rp_signature.py` → World ID 4.0 request signing, pinned to World's vectors
+`api/world.py` → verification with World and the attestation the contract trusts
+`api/routers/world.py` → `/world/rp-context`, `/world/verify`, `/world/attestation`
+`frontend/ZoneGoApp/src/screens/IdentityCheck.tsx` → IDKit, on `feat/frontend-rebuild`
 `feedback/world.md` → our feedback
 
 </td><td width="33%" valign="top">
@@ -183,12 +193,16 @@ literally what the prize asks for**, not a login button.
 runs the bodega and the neighbour buying bread. Neither will install an
 extension or write twelve words on paper.
 
-The merchant signs in with email, gets an embedded wallet, funds a campaign.
-The visitor signs in with a phone number, gets a wallet, gets paid. A complete
-B2B2C financial flow where **neither side knows there is a blockchain
-underneath.**
+The merchant signs in with email, gets an embedded wallet, and approves and
+funds a campaign in USDC from it. The visitor signs in with email — or a phone
+number in the US and Canada, where Privy's SMS reaches — gets a wallet, and is
+paid into it. A complete financial flow where **neither side knows there is a
+blockchain underneath.**
 
-`api/config.py` → chain config, Base Sepolia
+All on branch `feat/frontend-rebuild`, under `frontend/ZoneGoApp/src/`:
+`main.tsx` → `PrivyProvider`, a wallet created for every user on login
+`screens/MerchantPanel.tsx` → `useSendTransaction`: approve USDC, fund the campaign
+`screens/ScanQr.tsx` → `useSignTypedData`: the merchant signs the visit
 `feedback/privy.md` → our feedback
 
 </td><td width="33%" valign="top">
@@ -225,6 +239,8 @@ api/          FastAPI — search, QR signing, relay, scoring, leaderboard
   geo.py        geohash and distance, no dependencies
   points.py     the scoring rules, mirrored from the subgraph
   subgraph.py   GraphQL client with a short cache
+  world.py      World verification, and the attestation the contract trusts
+  profiles.py   store names and descriptions, signed by the merchant
 subgraph/     The Graph — schema, ABIs, manifest, AssemblyScript mappings
 schema/       the event contract agreed between all four roles
 feedback/     sponsor feedback documents
@@ -285,13 +301,25 @@ while serving invented data.
 | | |
 |---|---|
 | `GET /health` | Status, and whether mock mode is on |
+| `GET /ready` | What is wired: node, index, keys, contract addresses |
+| `GET /metrics` | Rejected claims grouped by reason |
 | `GET /search` | Stores near a point, by radius and free text |
 | `GET /campaigns` | Campaigns, read from the subgraph when live |
+| `GET /campaigns/{id}` | One campaign, with the balance read from the vault |
 | `POST /qr/sign` | The EIP-712 payload a merchant signs |
 | `POST /visits/claim` | The relay — submits a claim and pays the gas |
-| `POST /score` | Fraud score, plus the three features behind it |
+| `POST /score` | Fraud score, plus the three features behind it — a placeholder until the model is served |
 | `GET /leaderboard` | Explorers and merchants, by zone or by week |
 | `GET /leaderboard/me` | One player's points, rank, and gap to the next |
+| `GET /epochs/current` | Which scoring epoch is open, and when it closes |
+| `GET /epochs/{epoch}` | An epoch's Merkle root, and whether it is on chain |
+| `GET /epochs/{epoch}/proof` | One wallet's score and its Merkle proof |
+| `GET /world/rp-context` | The signed request IDKit needs before it opens |
+| `POST /world/verify` | Checks a Selfie Check with World and attests the result |
+| `GET /world/attestation/{visitor}` | A fresh attestation for a visitor already bound on chain, for 15 days |
+| `GET /world/attester` | The address the contract trusts |
+| `POST /merchants/profile` | A store's name and description, signed by its wallet |
+| `GET /merchants/profile/{wallet}` | What a merchant has saved |
 
 ---
 
@@ -303,9 +331,12 @@ Honest, because a judge will find out anyway.
 |---|---|
 | API — 20 endpoints, **290 tests** | **Live** at `zonego-api.onrender.com` |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
-| World ID 4.0 | Request signing live and pinned to World's own vectors; the end-to-end flow waits on the frontend |
+| World ID 4.0 | Request signing live and pinned to World's own vectors; Selfie Check wired in the frontend |
 | Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |
-| Fraud model | Trains; live inference against the subgraph in progress |
+| Campaigns | Created and funded on chain from the frontend. **No visit has been claimed end to end yet** |
+| Fraud model | Trains and scores against the live subgraph on `feat/data-scientist`; not yet served by the API, which returns a placeholder score |
+| Epoch commitments | Built; none on chain yet, because there are no visits to score |
+| Store names | Signed by the merchant and kept by the API off chain — see the limits below |
 
 ### Deployed
 
@@ -339,8 +370,11 @@ addresses anybody can read, not a promise in a README.
 https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
 ```
 
-Everything the product shows about the past is read from that URL. Run the same
-queries and you get the same numbers — no database of ours sits in between.
+Every campaign, visit, reward and point the product shows is read from that
+URL. Run the same queries and you get the same numbers — no database of ours
+sits in between. The one exception is the name and description of a store,
+which the chain has no room for: the merchant signs them, and the API keeps
+them alongside.
 
 ### One thing we say before anyone asks
 
@@ -354,11 +388,14 @@ one fact, the contract believes us. Everywhere else the merchant signs and the
 chain decides. The attester address is published at `/world/attester` so the
 address the contract trusts can be checked against the one actually signing.
 
-**Known and deliberate:** the fraud model trains on synthetic data with four
-injected patterns. `ml/DATA.md` documents why they are synthetic, which fraud
-literature each pattern comes from, and how real data swaps in without
-changing the pipeline. A weakness you name first stops being an attack and
-becomes rigour.
+**Known and deliberate:** the fraud model trains on synthetic data, because a
+network with no visits has no fraud to learn from. `data_scientist/generate.py`
+on `feat/data-scientist` injects four patterns — impossible travel, visits out
+of hours, co-visiting wallets, and one nullifier behind many wallets — and
+`data_scientist/README.md` there reports how the model does against them. The
+loader reads the subgraph with the same columns as the synthetic file, so real
+visits replace it without changing the pipeline. A weakness you name first
+stops being an attack and becomes rigour.
 
 **Also known, and the next thing we would fix:** three things the API keeps in
 one process rather than in a shared store — the rate-limit counters, the
@@ -371,6 +408,13 @@ does not stand up Redis for them: the contract binds a nullifier to one wallet
 and refuses a second, and it refuses an epoch that is not greater than the one
 already committed. The process-local copies save a call, and the chain is what
 actually decides. At more than one replica that stops being a footnote.
+
+**One that does lose data today:** store names and descriptions are saved to a
+file on the API's instance. On Render's free plan that file is wiped whenever
+the service redeploys or sleeps after fifteen minutes without traffic, so a
+store falls back to its shortened address until the merchant saves again.
+Nothing about money depends on it — it is a label. `MERCHANT_PROFILES_PATH`
+points it at a persistent disk on a plan that has one.
 
 ---
 

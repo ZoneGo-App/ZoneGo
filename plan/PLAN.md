@@ -1,526 +1,532 @@
-# ZoneGo — Plan de ejecución · 9 días
+# ZoneGo — Execution plan · 9 days
 
-**ETHOnline 2026 · Vía From Scratch · Base Sepolia · Equipo de cuatro**
-Estado al **lunes 7 de septiembre — día 4**. Cierre: **domingo 13, 12:00 ET**.
+**ETHOnline 2026 · From Scratch track · Base Sepolia · Team of four**
+State as of **Monday 7 September — day 4**. Deadline: **Sunday 13, 12:00 ET**.
 
-El hackathon arrancó el viernes 4 de septiembre a las 12:00 ET. Cada día cierra
-con un hito verificable: **si no se puede demostrar, el día no está cerrado.**
-El ✔ marca lo que ya se puede demostrar hoy.
+> **This is a snapshot, kept as the record of how the work was planned and
+> split.** It was written on day 4 and has not been updated since, except to
+> translate it. It is not the current state of the project: for that, read the
+> *Status* section of the [README](../README.md). Some assumptions below turned
+> out to be wrong once checked — Privy organization wallets were not required.
+> Prize amounts and weightings the original carried have been left out of the
+> translation, because they did not match the prize pages; the requirement
+> tables are kept as the team read them on day 4.
 
----
-
-## El producto
-
-El vecino busca algo cerca, camina hasta el local, escanea un QR y cobra. El
-comercio paga solo cuando un humano único verificado cruza su puerta, y puede
-auditar cada pago contra la cadena sin confiar en nosotros.
-
-**La decisión que sostiene todo:** el comercio firma la visita con EIP-712 desde
-su dispositivo, el vecino envía esa firma al contrato, y el contrato la verifica
-en cadena. Nuestro servidor paga el gas por comodidad, no por autoridad.
-
-Tres patrocinadores, ninguno removible: **World** (humano único), **Privy**
-(billeteras sin frase semilla), **The Graph** (historial auditable).
+The hackathon started on Friday 4 September at 12:00 ET. Every day closes with a
+milestone that can be checked: **if it cannot be demonstrated, the day is not
+closed.** ✔ marks what could be demonstrated on the day this was written.
 
 ---
 
-## Los cuatro roles
+## The product
 
-| Persona | Dominio | Es dueño de | Entrega al equipo |
+The neighbour searches for something nearby, walks to the store, scans a QR and
+gets paid. The merchant pays only when a unique, verified human walks through
+the door, and can audit every payment against the chain without trusting us.
+
+**The decision everything rests on:** the merchant signs the visit with EIP-712
+from their own device, the neighbour submits that signature to the contract, and
+the contract verifies it on chain. Our server pays the gas as a convenience, not
+as an authority.
+
+Three sponsors, none of them removable: **World** (unique human), **Privy**
+(wallets without a seed phrase), **The Graph** (auditable history).
+
+---
+
+## The four roles
+
+| Person | Domain | Owns | Delivers to the team |
 |---|---|---|---|
-| **Sebastián** | Contratos y Web3 | `CampaignVault`, `VisitRegistry`, `FraudOracle`, verificación EIP-712, integración World ID, tests de Foundry | ABIs, direcciones desplegadas, tests en verde |
-| **Lucio** | Servicios e infraestructura | API FastAPI, subgraph, servicio de épocas y árbol de Merkle, despliegue, monitoreo, CI | Endpoints documentados y URL del subgraph |
-| **Edmer** | Ciencia de datos | Generador sintético, rasgos, modelo de fraude, clasificador de rubro, simulación de ataques, métricas | Modelo servido y tabla de métricas reproducible |
-| **David** | Frontend y producto | App del vecino, panel del comercio, integración Privy, escáner QR, flujo de World | Demo navegable y las capturas del envío |
+| **Sebastián** | Contracts and Web3 | `CampaignVault`, `VisitRegistry`, `FraudOracle`, EIP-712 verification, World ID integration, Foundry tests | ABIs, deployed addresses, green tests |
+| **Lucio** | Services and infrastructure | FastAPI API, subgraph, epoch service and Merkle tree, deployment, monitoring, CI | Documented endpoints and the subgraph URL |
+| **Edmer** | Data science | Synthetic generator, features, fraud model, category classifier, attack simulation, metrics | A served model and a reproducible metrics table |
+| **David** | Frontend and product | Neighbour app, merchant panel, Privy integration, QR scanner, World flow | A navigable demo and the submission screenshots |
 
-**Frontera Sebastián / Lucio.** Todo lo que compila a bytecode es de Sebastián.
-Todo lo que corre en un servidor es de Lucio. El subgraph es de Lucio porque es
-TypeScript y consultas, no Solidity.
+**The Sebastián / Lucio boundary.** Everything that compiles to bytecode is
+Sebastián's. Everything that runs on a server is Lucio's. The subgraph is
+Lucio's because it is TypeScript and queries, not Solidity.
 
-**La regla que evita el bloqueo.** El esquema de eventos está congelado en
-`schema/events.md` y nadie lo cambia sin acuerdo de los cuatro.
+**The rule that prevents blocking.** The event schema is frozen in
+`schema/events.md`, and nobody changes it without all four agreeing.
 
 ---
 
-## Lo que está en pie hoy
+## What was standing on day 4
 
-### Cadena — Base Sepolia, bloques 46522139–46522140
+### Chain — Base Sepolia
 
-```
-CampaignVault    0x7b4aaDDe248818bAD121431eAd1a3A865914c419
-VisitRegistry    0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e
-FraudOracle      0xfD18B748C0868C64d0bC5a68896CF3aF1d776243
-```
+The contracts deployed at the time were redeployed on 12 September. The current
+addresses and the subgraph URL are in the README, and listing old ones here
+would only give a reader two sets to choose between.
 
-### Subgraph — desplegado y consultable
+### Branches
 
-```
-https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
-```
-
-### Ramas
-
-| Rama | Commits sobre `main` | Contenido |
+| Branch | Commits ahead of `main` | Contents |
 |---|---|---|
-| `feat/api-base` | 57 | API con 12 endpoints, 164 tests, subgraph |
-| `feat/contracts-skeleton` | 11 | Tres contratos, desplegados, 4 tests |
-| `feat/data-scientist` | 2 | Generador, esquema de eventos, entrenamiento |
-| `main` | — | **Un solo archivo: `README.md`** |
+| `feat/api-base` | 57 | API with 12 endpoints, 164 tests, subgraph |
+| `feat/contracts-skeleton` | 11 | Three contracts, deployed, 4 tests |
+| `feat/data-scientist` | 2 | Generator, event schema, training |
+| `main` | — | **A single file: `README.md`** |
 
 ---
 
-# DÍA 1 — viernes 4 de septiembre
-## Cimientos, contrato de datos y decisión de cadena
+# DAY 1 — Friday 4 September
+## Foundations, the data contract, and the chain decision
 
-**Foco.** Congelar el esquema de eventos para desbloquear a los cuatro en
-paralelo, y dejar el repositorio con historial real desde la primera hora.
+**Focus.** Freeze the event schema so all four can work in parallel, and give
+the repository a real history from the first hour.
 
-### Sebastián — contratos y Web3
-- ✔ Organización de GitHub y repositorio público con licencia MIT, `.gitignore`
-  y README inicial. Enlazado en el panel de ETHGlobal.
-- ✔ Foundry en `/contracts`. Interfaces y eventos de los tres contratos.
-- ✔ `struct` EIP-712 de la visita y su typehash — el contrato entre el QR y la
-  cadena.
-- ✔ La cadena es **Base Sepolia**: World ID Router en
-  `0x42FF98C4E85212a5D31358ACbFe76a621b50fC02`, The Graph la indexa como
-  `base-sepolia` (chainId 84532), Privy es agnóstico.
+### Sebastián — contracts and Web3
+- ✔ GitHub organization and a public repository with an MIT license,
+  `.gitignore` and an initial README. Linked in the ETHGlobal dashboard.
+- ✔ Foundry in `/contracts`. Interfaces and events for the three contracts.
+- ✔ The EIP-712 `struct` for a visit and its typehash — the contract between
+  the QR and the chain.
+- ✔ The chain is **Base Sepolia**: World ID Router at
+  `0x42FF98C4E85212a5D31358ACbFe76a621b50fC02`, The Graph indexes it as
+  `base-sepolia` (chainId 84532), Privy is chain-agnostic.
 
-### Lucio — servicios e infraestructura
-- ✔ CI en GitHub Actions: los tests corren en cada push y cada PR.
-- ✔ Esqueleto de FastAPI en `/api` con `/health`, Pydantic y `docker-compose`.
-- ✔ Servidor simulado con el esquema congelado, para que David no espere.
+### Lucio — services and infrastructure
+- ✔ CI on GitHub Actions: tests run on every push and every PR.
+- ✔ FastAPI skeleton in `/api` with `/health`, Pydantic and `docker-compose`.
+- ✔ A mock server on the frozen schema, so David does not have to wait.
 
-### Edmer — ciencia de datos
-- ✔ `generate.py`: comercios con horario y coordenadas reales del Lower East
-  Side (40,7220 / −73,9870), vecinos, y visitas etiquetadas.
-- ✔ Cuatro patrones de fraude inyectados: viaje imposible, co-visita
-  sistemática, ráfaga fuera de horario, reclamo repetido bajo distinto nullifier.
-- ✔ Proporción de fraude al 8%, desbalanceada a propósito.
+### Edmer — data science
+- ✔ `generate.py`: merchants with real opening hours and coordinates on the
+  Lower East Side (40.7220 / −73.9870), neighbours, and labelled visits.
+- ✔ Four injected fraud patterns: impossible travel, systematic co-visiting,
+  out-of-hours bursts, repeated claims under different nullifiers.
+- ✔ Fraud rate at 8%, imbalanced on purpose.
 
-### David — frontend y producto
-- ✗ Scaffold de Next.js 14 con TypeScript y Tailwind.
-- ✗ `@privy-io/react-auth` con login por correo y por teléfono, mostrando la
-  dirección de la billetera embebida.
+### David — frontend and product
+- ✗ Next.js 14 scaffold with TypeScript and Tailwind.
+- ✗ `@privy-io/react-auth` with email and phone login, showing the embedded
+  wallet's address.
 
-**Hito de cierre.** Repositorio público enlazado con commits de cuatro autores.
-Cadena decidida. `forge build` compila. CI en verde. Login de Privy funcionando.
-`docker compose up` levanta la API. 20.000 visitas etiquetadas en CSV.
+**Closing milestone.** Public repository linked, with commits from four authors.
+Chain decided. `forge build` compiles. CI green. Privy login working.
+`docker compose up` starts the API. 20,000 labelled visits in a CSV.
 
 ---
 
-# DÍA 2 — sábado 5 de septiembre
-## Campañas en cadena y línea base del modelo
+# DAY 2 — Saturday 5 September
+## Campaigns on chain and a model baseline
 
-**Foco.** Que un comercio pueda crear y financiar una campaña en testnet, y tener
-un número contra el cual medir el modelo el resto de la semana.
+**Focus.** A merchant can create and fund a campaign on testnet, and there is a
+number to measure the model against for the rest of the week.
 
-### Sebastián — contratos y Web3
+### Sebastián — contracts and Web3
 - ✔ `CampaignVault.sol`: `createCampaign(rewardPerVisit, dailyCap, geohash,
-  radius)`, `fund()` con USDC de prueba, `withdraw()` del remanente.
-- ✔ Tests de los caminos de error: financiar campaña inexistente, retirar sin ser
-  dueño, superar el tope diario.
-- ✔ Desplegar en testnet.
+  radius)`, `fund()` with test USDC, `withdraw()` of the remainder.
+- ✔ Tests for the failure paths: funding a campaign that does not exist,
+  withdrawing without being the owner, exceeding the daily cap.
+- ✔ Deploy to testnet.
 
-### Lucio — servicios e infraestructura
-- ✔ Lectura de campañas contra el nodo, con caché. Cliente tipado del contrato.
-- ✔ `POST /qr/sign`: el servidor arma el payload EIP-712 **pero no firma** —
-  firma el comercio con su billetera.
+### Lucio — services and infrastructure
+- ✔ Campaign reads against the node, with a cache. A typed contract client.
+- ✔ `POST /qr/sign`: the server builds the EIP-712 payload **but does not sign
+  it** — the merchant signs with their own wallet.
 
-### Edmer — ciencia de datos
-- ✔ Rasgos v1: tiempo desde la visita anterior del mismo nullifier, velocidad
-  implícita entre locales, desvío del horario modal, grado de co-visita.
-- ✔ Regresión logística balanceada y árbol de gradiente, contra la línea base
-  trivial.
-- ✔ F1 macro y recall de la clase fraude. **El recall es la métrica que importa:**
-  dejar pasar fraude cuesta dinero del comercio.
+### Edmer — data science
+- ✔ Features v1: time since the same nullifier's previous visit, implied speed
+  between stores, deviation from the modal hour, co-visit degree.
+- ✔ Balanced logistic regression and gradient boosting, against the trivial
+  baseline.
+- ✔ Macro F1 and recall on the fraud class. **Recall is the metric that
+  matters:** letting fraud through costs the merchant money.
 
-### David — frontend y producto
-- ✗ Pantalla de creación de campaña: rubro, recompensa, presupuesto, tope diario
-  y radio sobre un mapa.
-- ✗ Conectar al contrato con `wagmi` + `viem`, firmando con la billetera de Privy.
+### David — frontend and product
+- ✗ Campaign creation screen: category, reward, budget, daily cap and radius on
+  a map.
+- ✗ Connect to the contract with `wagmi` + `viem`, signing with the Privy wallet.
 
-**Hito de cierre.** Campaña creada y financiada con USDC de prueba, visible en el
-explorador con su hash. Tabla comparativa de dos modelos con F1 macro.
-
----
-
-# DÍA 3 — domingo 6 de septiembre
-## El bucle completo, y el backend fuera de la ruta de confianza
-
-**Foco.** Que una visita termine en transferencia real de USDC en testnet, con el
-contrato verificando la firma del comercio. Es el día más importante de los nueve.
-
-### Sebastián — contratos y Web3
-- ✔ `VisitRegistry.claim(...)`: verifica **en cadena** la firma EIP-712 del
-  comercio, la vigencia, el nullifier y el tope diario. Transfiere y emite.
-- ✔ Nonce de un solo uso por comercio, registrado en cadena.
-- ✔ **La curva decreciente en el contrato**: 1ª visita 100%, 2ª 50%, 3ª 25%,
-  4ª 0, por semana. **La calcula el contrato, no el servidor** — si la decide el
-  backend, volvemos a ser autoridad y se cae la respuesta al jurado.
-
-### Lucio — servicios e infraestructura
-- ✔ Relevo de transacciones, documentado como opcional: el vecino puede enviar la
-  firma él mismo.
-- ✔ `GET /search?q=&lat=&lon=&radius=` — la puerta de entrada del producto.
-  Filtro por rubro y palabra sobre lo que el comercio declaró que vende, más
-  distancia. Sin modelo. Radio de 1, 5 o 10 km.
-- ✔ `POST /score` devolviendo puntaje y los tres rasgos que más pesaron.
-
-### Edmer — ciencia de datos
-- ✔ Arreglar el generador: geografía a Nueva York (sigma 0,008), un nullifier
-  estable por billetera, y que el viaje imposible mueva al visitante.
-- ✔ Reescribir el pipeline de rasgos para que consuma **el esquema del evento**,
-  no el CSV.
-- Clasificador de rubro desde la descripción libre — TF-IDF y regresión logística.
-
-### David — frontend y producto
-- ✗ Barra de búsqueda y selector de radio. Es la primera pantalla de la app.
-- ✗ Resultados sobre mapa de Google embebido, cada comercio mostrando cuánto
-  paga hoy.
-- ✗ Autocompletado de Places en el alta del comercio, guardando el `place_id`.
-- ✗ Escáner de QR con `html5-qrcode` y confirmación de cobro.
-- ✗ Pantalla del comercio que genera el QR firmado, **regenerándolo cada 30
-  segundos**. La firma vale 90, para que un escaneo lento no falle.
-
-**Hito de cierre.** Bucle completo en testnet: buscar «sneakers», ver comercios
-en el radio, generar QR firmado, escanear, reclamar y recibir USDC. El hash de
-esa primera transacción va al README.
+**Closing milestone.** A campaign created and funded with test USDC, visible in
+the explorer with its hash. A comparison table of two models with macro F1.
 
 ---
 
-# DÍA 4 — lunes 7 de septiembre · HOY
-## El subgraph: The Graph como fuente de verdad
+# DAY 3 — Sunday 6 September
+## The full loop, and the backend out of the trust path
 
-**Foco.** Sacar todas las consultas de historial de la base propia y ponerlas
-contra el subgraph. **Project Check-in #1, 23:59 ET.**
+**Focus.** A visit ends in a real USDC transfer on testnet, with the contract
+verifying the merchant's signature. The most important day of the nine.
 
-### Lucio — servicios e infraestructura
-- ✔ `schema.graphql` con Campaign, Visit, Merchant y Visitor y relaciones
-  derivadas. Diez entidades.
-- ✔ Mappings en AssemblyScript y **despliegue en Subgraph Studio**. Entidades
-  agregadas por hora y por comercio.
-- ✔ Toda lectura de historial de la API va contra GraphQL.
+### Sebastián — contracts and Web3
+- ✔ `VisitRegistry.claim(...)`: verifies **on chain** the merchant's EIP-712
+  signature, its validity window, the nullifier and the daily cap. Transfers
+  and emits.
+- ✔ A single-use nonce per merchant, recorded on chain.
+- ✔ **The decaying curve in the contract**: 1st visit 100%, 2nd 50%, 3rd 25%,
+  4th 0, per week. **The contract calculates it, not the server** — if the
+  backend decides it, we are an authority again and the answer to the judges
+  falls apart.
 
-### Sebastián — contratos y Web3
-- ✔ `CampaignCreated` emite geohash y radius. **Última ventana para tocar el
-  esquema.**
-- ✔ Redesplegar los tres contratos, con `FraudOracle` en `DeployAll.s.sol`.
-- ✔ Empezar `FraudOracle.sol`: firmas de `commitEpoch` y `verifyScore`.
+### Lucio — services and infrastructure
+- ✔ A transaction relay, documented as optional: the neighbour can submit the
+  signature themselves.
+- ✔ `GET /search?q=&lat=&lon=&radius=` — the product's front door. Filter by
+  category and by words in what the merchant declared they sell, plus distance.
+  No model. Radius of 1, 5 or 10 km.
+- ✔ `POST /score` returning a score and the three features that weighed most.
 
-### Edmer — ciencia de datos
-- ✗ **[REQUISITO DURO]** Cliente GraphQL contra el subgraph. Hoy
-  `load_events_from_subgraph()` es un stub. **La URL ya está arriba y responde.**
-- ✗ Rasgos que *solo* son calculables con el grafo indexado: entropía de
-  comercios visitados y concentración temporal por campaña.
-- ✗ Reentrenar y medir la mejora respecto de la línea base del día 2, y
-  commitear la tabla.
-- Devolver siempre los tres rasgos que más pesaron.
+### Edmer — data science
+- ✔ Fix the generator: geography moved to New York (sigma 0.008), a stable
+  nullifier per wallet, and impossible travel that actually moves the visitor.
+- ✔ Rewrite the feature pipeline to consume **the event schema**, not the CSV.
+- Category classifier from the free-text description — TF-IDF and logistic
+  regression.
 
-### David — frontend y producto
-- ✗ Panel del comercio leyendo del subgraph: visitas por hora, costo por visita
-  real, presupuesto restante.
-- ✗ Estados vacíos y de carga en todas las vistas.
+### David — frontend and product
+- ✗ Search bar and radius selector. The app's first screen.
+- ✗ Results on an embedded Google map, each merchant showing what it pays today.
+- ✗ Places autocomplete when a merchant signs up, storing the `place_id`.
+- ✗ QR scanner with `html5-qrcode` and payment confirmation.
+- ✗ Merchant screen generating the signed QR, **regenerated every 30 seconds**.
+  The signature lasts 90, so a slow scan does not fail.
 
-> **El requisito que descalifica un premio de 10.000.** The Graph exige textual
-> *«consumir datos en vivo, no conjuntos simulados ni locales»*. El CSV sirve
-> para entrenar; la inferencia de la demo corre contra el subgraph o quedamos
-> fuera del premio.
-
-**Hito de cierre.** Subgraph desplegado y consultable por URL pública. El panel
-se alimenta solo de GraphQL. Métrica del modelo antes y después de los rasgos de
-grafo.
+**Closing milestone.** The full loop on testnet: search "sneakers", see
+merchants in range, generate a signed QR, scan, claim and receive USDC. The hash
+of that first transaction goes into the README.
 
 ---
 
-# DÍA 5 — martes 8 de septiembre
-## World ID y el oráculo de fraude en cadena
+# DAY 4 — Monday 7 September · TODAY
+## The subgraph: The Graph as the source of truth
 
-**Foco.** Cerrar el agujero de Sybil y llevar la salida del modelo a la cadena.
-Sesión de feedback con mentores, 14:00 a 16:00 ET.
+**Focus.** Move every history query off our own store and onto the subgraph.
+**Project Check-in #1, 23:59 ET.**
 
-### Sebastián — contratos y Web3
-- Integrar **World Selfie Check** con la Sandbox App. El `nullifierHash` queda
-  atado a la billetera de Privy. Hoy `VisitRegistry.claim` tiene la verificación
-  como `TODO`: acepta el nullifier sin comprobarlo contra el router de World.
-- **Flujo por riesgo, no verificación plana:** Selfie Check habilita recompensas
-  chicas; para recompensa alta, exigir Orb u Official ID.
-- **Revalidación a los 90 días** — la verificación de Selfie Check caduca.
-- Terminar `FraudOracle`: `commitEpoch(bytes32 root, uint64 epoch)` **con control
-  de acceso**, y `verifyScore(address, uint16, bytes32[] proof)`. Hoy los dos son
+### Lucio — services and infrastructure
+- ✔ `schema.graphql` with Campaign, Visit, Merchant and Visitor and derived
+  relationships. Ten entities.
+- ✔ AssemblyScript mappings and **deployment to Subgraph Studio**. Entities
+  aggregated by hour and by merchant.
+- ✔ Every history read in the API goes through GraphQL.
+
+### Sebastián — contracts and Web3
+- ✔ `CampaignCreated` emits geohash and radius. **The last window to touch the
+  schema.**
+- ✔ Redeploy the three contracts, with `FraudOracle` in `DeployAll.s.sol`.
+- ✔ Start `FraudOracle.sol`: the signatures of `commitEpoch` and `verifyScore`.
+
+### Edmer — data science
+- ✗ **[HARD REQUIREMENT]** A GraphQL client against the subgraph. Today
+  `load_events_from_subgraph()` is a stub. **The URL is published and answers.**
+- ✗ Features that can *only* be calculated with the indexed graph: entropy of
+  visited merchants and temporal concentration per campaign.
+- ✗ Retrain, measure the improvement over the day 2 baseline, and commit the
+  table.
+- Always return the three features that weighed most.
+
+### David — frontend and product
+- ✗ Merchant panel reading from the subgraph: visits per hour, real cost per
+  visit, remaining budget.
+- ✗ Empty and loading states in every view.
+
+> **The requirement that disqualifies a prize.** The Graph requires, verbatim,
+> *"consume live data, not mocked or local datasets"*. The CSV is for training;
+> inference in the demo runs against the subgraph, or we are out of the prize.
+
+**Closing milestone.** Subgraph deployed and queryable at a public URL. The
+panel is fed only by GraphQL. Model metrics before and after the graph
+features.
+
+---
+
+# DAY 5 — Tuesday 8 September
+## World ID and the fraud oracle on chain
+
+**Focus.** Close the Sybil hole and bring the model's output on chain. Mentor
+feedback session, 14:00 to 16:00 ET.
+
+### Sebastián — contracts and Web3
+- Integrate **World Selfie Check** with the Sandbox App. The `nullifierHash` is
+  bound to the Privy wallet. Today `VisitRegistry.claim` has verification as a
+  `TODO`: it accepts the nullifier without checking it against World's router.
+- **Risk-based flow, not flat verification:** Selfie Check unlocks small rewards;
+  high rewards require Orb or Official ID.
+- **Revalidation at 90 days** — a Selfie Check verification expires.
+- Finish `FraudOracle`: `commitEpoch(bytes32 root, uint64 epoch)` **with access
+  control**, and `verifyScore(address, uint16, bytes32[] proof)`. Today both are
   `revert("not implemented")`.
-- Confirmar el formato de la hoja del árbol:
+- Confirm the leaf format of the tree:
 
 ```
 leaf = keccak256(keccak256(abi.encode(address wallet, uint16 score)))
-node = keccak256(a + b), con el par ordenado
+node = keccak256(a + b), with the pair sorted
 ```
 
-  El puntaje va en basis points, 0 a 10.000 (0,7213 → 7213), porque
-  `verifyScore` toma un `uint16`. Encaja con `MerkleProof.verify` de OpenZeppelin
-  sin tocar nada. Sin control de acceso en `commitEpoch`, cualquiera puede
-  publicar una raíz y se cae el argumento de auditoría entero.
+  The score is in basis points, 0 to 10,000 (0.7213 → 7213), because
+  `verifyScore` takes a `uint16`. It fits OpenZeppelin's `MerkleProof.verify`
+  unchanged. Without access control on `commitEpoch`, anyone can publish a root
+  and the whole audit argument collapses.
 
-### Lucio — servicios e infraestructura
-- ✔ El ranking, como consulta al subgraph. `GET /leaderboard`: 5 puntos por
-  visita, 10 si el comercio es nuevo, 0 el mismo local el mismo día. Semanal y de
-  por vida. **Los puntos los cuenta la cadena, no nuestra base.**
-- ✔ Competencia por zona: los primeros seis caracteres del geohash que el
-  comercio ya firma, unas seis cuadras. Sin datos de mapas ni API.
-- ✔ Panel personal. `GET /leaderboard/me`: puntos propios, cuántos juegan en esa
-  zona, y cuántos faltan para pasar al de arriba.
-- ✔ Árbol de Merkle sobre pares (billetera, puntaje).
-- ✔ Servicio de época y endpoint de la prueba: `GET /epochs/current`,
+### Lucio — services and infrastructure
+- ✔ The leaderboard, as a subgraph query. `GET /leaderboard`: 5 points per visit,
+  10 if the merchant is new, 0 for the same store on the same day. Weekly and
+  all-time. **The chain counts the points, not our store.**
+- ✔ Competition by zone: the first six characters of the geohash the merchant
+  already signs, about six blocks. No map data, no API.
+- ✔ Personal panel. `GET /leaderboard/me`: your own points, how many play in that
+  zone, and how many you need to pass the one above.
+- ✔ Merkle tree over (wallet, score) pairs.
+- ✔ Epoch service and proof endpoint: `GET /epochs/current`,
   `GET /epochs/{n}`, `GET /epochs/{n}/proof`.
-- Publicar la raíz en cadena cada hora, en cuanto `commitEpoch` exista.
-- Endpoint del **Sybil Score** de World — espera el permiso de World.
+- Publish the root on chain every hour, as soon as `commitEpoch` exists.
+- World **Sybil Score** endpoint — waiting on permission from World.
 
-### Edmer — ciencia de datos
-- Cerrar lo del día 4 antes que nada: la inferencia contra el subgraph y los
-  rasgos de grafo.
-- Reemplazar `wallet_score()` en `api/routers/score.py`: devuelve un float de 0 a
-  1 y nada más — la API lo convierte a basis points y lo mete en el árbol.
-- Sumar el **Sybil Score de World** como rasgo, combinado con los rasgos de
-  co-visita del subgraph.
-- Definir el umbral con la curva de precisión-recall, no a ojo.
-- Preparar la respuesta a «¿qué pasa si el modelo se equivoca?»: la retención es
-  reversible y el vecino puede apelar.
+### Edmer — data science
+- Close day 4 first: inference against the subgraph and the graph features.
+- Replace `wallet_score()` in `api/routers/score.py`: it returns a float from 0
+  to 1 and nothing else — the API converts it to basis points and puts it in the
+  tree.
+- Add World's **Sybil Score** as a feature, combined with the co-visit features
+  from the subgraph.
+- Set the threshold from the precision-recall curve, not by eye.
+- Prepare the answer to "what happens if the model is wrong?": holding is
+  reversible and the neighbour can appeal.
 
-### David — frontend y producto
-- **Todo lo pendiente de los días 1 a 4** — es la ruta crítica del proyecto.
-- Flujo de verificación de World con estados de pendiente, verificado y rechazado.
-- Pantalla de ranking — Zone Explorers. Tabla semanal, tu puesto, y el histórico
-  de comercios descubiertos.
-- Segunda tabla: comercios más visitados del barrio. Sale del mismo subgraph.
-- Panel de fraude del comercio: visitas retenidas, puntaje, y los rasgos que lo
-  explican.
-- Presentar en la sesión de feedback de las 14:00 ET.
+### David — frontend and product
+- **Everything pending from days 1 to 4** — it is the project's critical path.
+- World verification flow with pending, verified and rejected states.
+- Leaderboard screen — Zone Explorers. Weekly table, your position, and the
+  history of merchants discovered.
+- Second table: the most visited merchants in the neighbourhood. From the same
+  subgraph.
+- Merchant fraud panel: held visits, score, and the features that explain it.
+- Present at the 14:00 ET feedback session.
 
-**Hito de cierre.** Un vecino sin verificar no puede cobrar, demostrable en
-testnet. Raíz de Merkle publicada con al menos tres épocas. Una prueba de Merkle
-verificada en cadena desde el panel.
-
----
-
-# DÍA 6 — miércoles 9 de septiembre
-## Endurecer: romperlo antes de que lo rompa un juez
-
-**Foco.** Atacar el sistema a propósito y medir qué aguanta. Es el día que separa
-un prototipo de un producto.
-
-### Sebastián — contratos y Web3
-- Protección contra repetición: un QR fotografiado y usado dos minutos después
-  debe revertir. **Escribir el test que lo demuestra.**
-- Límite de tasa por nullifier y por campaña. Pausa de emergencia para el dueño
-  de la campaña.
-
-### Lucio — servicios e infraestructura
-- Límite de tasa en la API, monitoreo y alertas.
-- Registro estructurado de cada reclamo rechazado y por qué.
-
-### Edmer — ciencia de datos
-- Simular tres ataques y medir la detección: granja de treinta billeteras
-  verificadas, comercio que se auto-visita, colusión entre dos comercios vecinos.
-- Documentar la tasa de detección de cada uno en una tabla.
-
-### David — frontend y producto
-- **Billeteras de organización** de Privy para el comercio, no personales.
-  Requisito textual del premio B2B.
-- **Política de transferencia:** el saldo de la campaña solo sale hacia
-  recompensas de visita, con tope diario.
-- Fusionar alta de campaña y panel en una sola vista «Mi panel», que cambia según
-  el rol, con la columna de estado: pagada, retenida, con el puntaje.
-- Errores visibles con salida: QR vencido, fuera de radio, ya cobrado hoy,
-  verificación pendiente.
-- Responsive real: la app se usa en la calle, en un teléfono, con una mano.
-
-**Hito de cierre.** Test de Foundry que prueba que un QR reutilizado revierte.
-Tabla de tres ataques con su tasa de detección. App usable en teléfono.
+**Closing milestone.** An unverified neighbour cannot get paid, demonstrable on
+testnet. A Merkle root published for at least three epochs. A Merkle proof
+verified on chain from the panel.
 
 ---
 
-# DÍA 7 — jueves 10 de septiembre
-## Despliegue público y datos de demostración
+# DAY 6 — Wednesday 9 September
+## Hardening: break it before a judge does
 
-**Foco.** Que cualquiera con el enlace pueda usar ZoneGo sin nosotros presentes.
-Requisito duro para ser finalista. Segunda sesión de feedback, 09:00 a 11:00 ET.
+**Focus.** Attack the system on purpose and measure what holds. The day that
+separates a prototype from a product.
+
+### Sebastián — contracts and Web3
+- Replay protection: a QR photographed and used two minutes later must revert.
+  **Write the test that proves it.**
+- A rate limit per nullifier and per campaign. An emergency pause for the
+  campaign owner.
+
+### Lucio — services and infrastructure
+- API rate limiting, monitoring and alerts.
+- Structured logging of every rejected claim and why.
+
+### Edmer — data science
+- Simulate three attacks and measure detection: a farm of thirty verified
+  wallets, a merchant visiting itself, collusion between two neighbouring
+  merchants.
+- Document the detection rate for each in a table.
+
+### David — frontend and product
+- Privy **organization wallets** for the merchant, not personal ones. Believed at
+  the time to be a verbatim requirement of the B2B prize.
+- **Transfer policy:** the campaign balance can only leave as visit rewards,
+  with a daily cap.
+- Merge campaign creation and the panel into a single "My Panel" view that
+  changes with the role, with a status column: paid, held, with the score.
+- Visible errors with a way out: expired QR, out of range, already claimed
+  today, verification pending.
+- Truly responsive: the app is used on the street, on a phone, one-handed.
+
+**Closing milestone.** A Foundry test proving a reused QR reverts. A table of
+three attacks with their detection rates. App usable on a phone.
+
+---
+
+# DAY 7 — Thursday 10 September
+## Public deployment and demo data
+
+**Focus.** Anyone with the link can use ZoneGo without us present. A hard
+requirement to be a finalist. Second feedback session, 09:00 to 11:00 ET.
 **Project Check-in #2, 23:59 ET.**
 
-### Lucio — servicios e infraestructura
-- Desplegar la API en producción con dominio y HTTPS. Variables de entorno fuera
-  del repositorio. Hoy hay `Dockerfile` y `docker-compose.yml` pero **ningún
-  destino elegido**.
-- Dejar el trabajo por época corriendo automáticamente y monitoreado.
-- README con las direcciones de los tres contratos, la URL del subgraph y cómo
-  levantarlo todo en local.
+### Lucio — services and infrastructure
+- Deploy the API to production with a domain and HTTPS. Environment variables
+  kept out of the repository. Today there is a `Dockerfile` and
+  `docker-compose.yml` but **no destination chosen**.
+- Leave the epoch job running automatically and monitored.
+- README with the three contract addresses, the subgraph URL and how to run
+  everything locally.
 
-### Sebastián — contratos y Web3
-- Sembrar tres campañas de demostración con comercios reconocibles y saldo
-  suficiente para que un juez pruebe sin agotarlas.
-- Verificar los tres contratos en el explorador y enlazarlos desde el README.
+### Sebastián — contracts and Web3
+- Seed three demo campaigns with recognisable merchants and enough balance for a
+  judge to try them without draining them.
+- Verify the three contracts in the explorer and link them from the README.
 
-> **Y esto no puede esperar al jueves.** La cadena está vacía: nadie llamó a
-> `createCampaign`. Sin una campaña real no hay demo, el subgraph no tiene qué
-> indexar, y The Graph no ve datos en vivo. Una sola llamada destraba las tres.
+> **And this cannot wait until Thursday.** The chain is empty: nobody has called
+> `createCampaign`. Without a real campaign there is no demo, the subgraph has
+> nothing to index, and The Graph sees no live data. One call unblocks all three.
 
-### Edmer — ciencia de datos
-- Escribir los documentos de feedback que exigen los premios. `the-graph.md` ya
-  tiene lo que costó y lo que funcionó del subgraph, y espera los números del
-  modelo base contra el modelo con rasgos de grafo. `world.md` tiene la parte de
-  backend. Faltan `privy.md` entero y las secciones de SDK y flujo de
-  verificación de World.
+### Edmer — data science
+- Write the feedback documents the prizes require. `the-graph.md` already has
+  what the subgraph cost and what worked, and waits for the numbers of the base
+  model against the model with graph features. `world.md` has the backend part.
+  Still missing: all of `privy.md`, and the SDK and verification-flow sections
+  of World's.
 
-### David — frontend y producto
-- Desplegar el frontend en Vercel con dominio propio.
-- **Modo demostración:** un botón que simula estar en el local, para que un juez
-  en otro país complete el recorrido sin viajar a Manhattan.
-- Las tres capturas y la imagen de portada del envío.
+### David — frontend and product
+- Deploy the frontend to Vercel with its own domain.
+- **Demo mode:** a button that simulates being at the store, so a judge in
+  another country can complete the journey without travelling to Manhattan.
+- The three screenshots and the cover image for the submission.
 
-**Hito de cierre.** URL pública probada desde un dispositivo que nunca tocó el
-proyecto. Tres campañas sembradas con saldo. Documentos de feedback commiteados.
-
----
-
-# DÍA 8 — viernes 11 de septiembre
-## El video y el borrador de envío
-
-**Foco.** El video es el filtro de la ronda 1 y lo que ven los patrocinadores. Se
-hace hoy, con dos días de margen.
-
-### Todo el equipo — los cuatro
-- Guion de **3 minutos 30, cronometrado**: 25 s de problema, 2 min de
-  demostración en vivo del recorrido completo, 40 s de arquitectura con el
-  puntaje en cadena, 25 s de las tres integraciones.
-- Grabar en 1080p, voz clara, **sin música y sin acelerar**. Entre 2 y 4 minutos,
-  corte duro: el sistema verifica el archivo y lo rechaza si no cumple.
-- Subir y esperar las marcas verdes de verificación.
-
-### Lucio y Edmer — servicios + datos
-- README principal: qué es, cómo funciona, métricas medidas, y la sección de
-  atribución de IA que ETHGlobal pide explícitamente.
-- Copiar los documentos de planificación a `/plan`.
-
-### Sebastián y David — cadena + frontend
-- Descripción larga del envío. Cuanto más detalle, más fácil es evaluarlo.
-- Las tres aplicaciones a premios, con el archivo, la línea y la función exacta
-  de cada integración.
-
-**Hito de cierre.** Video subido y verificado. Envío guardado con las tres
-aplicaciones cargadas. El proyecto ya está enviado; lo que queda es mejorarlo.
+**Closing milestone.** A public URL tested from a device that never touched the
+project. Three seeded campaigns with balance. Feedback documents committed.
 
 ---
 
-# DÍA 9 — sábado 12 de septiembre
-## Margen, pulido y reenvío
+# DAY 8 — Friday 11 September
+## The video and the draft submission
 
-**Foco.** Ningún desarrollo nuevo. Hoy solo se arregla lo roto y se pule lo que ya
-está.
+**Focus.** The video is the round 1 filter and what the sponsors watch. It gets
+made today, with two days of margin.
 
-### Todo el equipo — los cuatro
-- Recorrer el flujo completo tres veces desde tres dispositivos distintos, uno en
-  una red que nunca lo probó.
-- Verificar que el repositorio siga público y el despliegue en pie.
-- Ensayar las respuestas a las cinco preguntas probables del jurado, con el
-  número a mano.
+### The whole team — all four
+- A script of **3 minutes 30, timed**: 25 s of problem, 2 min of live
+  demonstration of the full journey, 40 s of architecture with the on-chain
+  score, 25 s on the three integrations.
+- Record in 1080p, clear voice, **no music and no speed-up**. Between 2 and 4
+  minutes, a hard cut: the system checks the file and rejects it if it does not
+  comply.
+- Upload and wait for the green verification marks.
 
-### Sebastián y Lucio — cadena + infra
-- Que las direcciones del README coincidan con las desplegadas. Subgraph
-  sincronizado y sin errores de indexación.
+### Lucio and Edmer — services + data
+- Main README: what it is, how it works, measured metrics, and the AI
+  attribution section ETHGlobal explicitly asks for.
+- Copy the planning documents into `/plan`.
 
-### Edmer — ciencia de datos
-- Que las cifras del README coincidan con la última corrida. **Una métrica que no
-  se puede reproducir es peor que no tenerla.**
+### Sebastián and David — chain + frontend
+- The long description of the submission. The more detail, the easier it is to
+  evaluate.
+- The three prize applications, with the exact file, line and function of each
+  integration.
 
-### David — frontend y producto
-- Última pasada de interfaz: nada desalineado, nada a medio traducir, nada roto
-  en teléfono.
-
-**Hito de cierre.** Proyecto reenviado con la versión final, 20 horas antes del
-cierre. Los cuatro con el enlace público probado desde su teléfono.
-
----
-
-## Lo que está abierto
-
-### Fusionar a `main` — de los cuatro
-`main` tiene un solo archivo. Es lo que ve cualquiera que abra el repositorio y
-lo que mira el chequeo automático de ETHGlobal. Tres ramas con 70 commits entre
-las tres están fuera. Cuanto más se demora, más cara sale la fusión.
-
-### Dónde viven el nombre del comercio y qué vende — decisión pendiente
-La cadena guarda geohash, recompensa, tope y radio: no el nombre ni el texto
-libre de lo que el comercio vende. Ese texto es lo que hace funcionar la
-búsqueda, que es la puerta de entrada del producto y la primera jugada de la
-demo. Contra la cadena, `/search` no tiene sobre qué buscar. Propuesta: IPFS, con
-el hash dentro de `CampaignCreated` — es una decisión con costo en el contrato.
-
-### Una wallet de relevo con ETH de prueba — Lucio
-El relevo está escrito y testeado contra un RPC simulado, pero nunca envió una
-transacción real. `RELAY_PRIVATE_KEY` está vacío.
-
-### Esperando a World
-El permiso para el Sybil Score sigue sin respuesta. Bloquea el rasgo de Edmer y
-el endpoint de Lucio, no el resto de la integración.
+**Closing milestone.** Video uploaded and verified. Submission saved with the
+three applications filled in. The project is already submitted; what remains is
+making it better.
 
 ---
 
-## Requisitos duros, con dueño y día
+# DAY 9 — Saturday 12 September
+## Margin, polish, and resubmission
 
-### ETHGlobal — descalifica el proyecto entero
+**Focus.** No new development. Today only what is broken gets fixed and what
+exists gets polished.
 
-| Requisito | Quién | Día | Si falta |
+### The whole team — all four
+- Walk the full flow three times from three different devices, one on a network
+  that has never tried it.
+- Check the repository is still public and the deployment is up.
+- Rehearse the answers to the five questions the judges are likely to ask, with
+  the number at hand.
+
+### Sebastián and Lucio — chain + infra
+- The addresses in the README match the deployed ones. Subgraph synced, with no
+  indexing errors.
+
+### Edmer — data science
+- The figures in the README match the latest run. **A metric that cannot be
+  reproduced is worse than not having one.**
+
+### David — frontend and product
+- A last pass on the interface: nothing misaligned, nothing half translated,
+  nothing broken on a phone.
+
+**Closing milestone.** Project resubmitted with the final version, 20 hours
+before the deadline. All four have tested the public link from their phones.
+
+---
+
+## What is open
+
+### Merging to `main` — all four
+`main` has a single file. It is what anyone opening the repository sees, and
+what ETHGlobal's automated check looks at. Three branches with 70 commits
+between them sit outside it. The longer it waits, the more the merge costs.
+
+### Where the merchant's name and what they sell live — decision pending
+The chain stores geohash, reward, cap and radius: not the name, nor the free
+text of what the merchant sells. That text is what makes search work, and search
+is the product's front door and the first move of the demo. Against the chain,
+`/search` has nothing to search on. Proposal: IPFS, with the hash inside
+`CampaignCreated` — a decision with a cost in the contract.
+
+### A relay wallet with test ETH — Lucio
+The relay is written and tested against a simulated RPC, but has never sent a
+real transaction. `RELAY_PRIVATE_KEY` is empty.
+
+### Waiting on World
+Permission for the Sybil Score is still unanswered. It blocks Edmer's feature
+and Lucio's endpoint, not the rest of the integration.
+
+---
+
+## Hard requirements, with owner and day
+
+### ETHGlobal — disqualifies the whole project
+
+| Requirement | Who | Day | If missing |
 |---|---|---|---|
-| Repositorio público durante todo el evento | Sebastián | ya | Descalificación |
-| Historial de commits real, incremental | Los cuatro | todos | Filtro ronda 1 |
-| Nada de código anterior al 4 de septiembre | Los cuatro | ya | Descalificación |
-| Desplegado y usable sin nosotros presentes | Lucio + David | 7 | No hay finalista |
-| Video de 2–4 min, 720p, sin música, sin acelerar | Los cuatro | 8 | Rechazo automático |
-| Enviar al menos una vez antes del domingo 12:00 ET | Uno solo | 8 | Sin premios |
-| **Project Check-in #1 — lunes 7, 23:59 ET** | Uno solo | **hoy** | Se pierde el depósito |
-| Project Check-in #2 — jueves 10, 23:59 ET | Uno solo | 7 | Se pierde el depósito |
-| Sección de atribución de IA en el README | Lucio + Edmer | 8 | Riesgo de descalificación |
-| Los cuatro en la ronda 2: lunes 14, 12:00–14:00 ET | Los cuatro | — | Descalificación automática |
+| Public repository for the whole event | Sebastián | done | Disqualification |
+| A real, incremental commit history | All four | every day | Round 1 filter |
+| No code from before 4 September | All four | done | Disqualification |
+| Deployed and usable without us present | Lucio + David | 7 | No finalist |
+| Video of 2–4 min, 720p, no music, no speed-up | All four | 8 | Automatic rejection |
+| Submit at least once before Sunday 12:00 ET | One person | 8 | No prizes |
+| **Project Check-in #1 — Monday 7, 23:59 ET** | One person | **today** | Deposit lost |
+| Project Check-in #2 — Thursday 10, 23:59 ET | One person | 7 | Deposit lost |
+| AI attribution section in the README | Lucio + Edmer | 8 | Risk of disqualification |
+| All four at round 2: Monday 14, 12:00–14:00 ET | All four | — | Automatic disqualification |
 
-### World — 3.500 USD
+### World — as understood on day 4
 
-| Requisito | Quién | Día |
+| Requirement | Who | Day |
 |---|---|---|
-| Selfie Check integrado y funcionando de punta a punta | Sebastián | 5 |
-| Usado como señal de riesgo, no como simple login | Sebastián | 5 |
-| Sybil Score como rasgo del modelo | Edmer | 5 |
-| Revalidación a los 90 días contemplada | Sebastián | 5 |
-| Documento de feedback — vale el 25% del premio | Los cuatro | 1 a 7 |
+| Selfie Check integrated and working end to end | Sebastián | 5 |
+| Used as a risk signal, not as a plain login | Sebastián | 5 |
+| Sybil Score as a model feature | Edmer | 5 |
+| 90-day revalidation accounted for | Sebastián | 5 |
+| Feedback document | All four | 1 to 7 |
 
-### Privy — 5.000 USD
+### Privy — as understood on day 4
 
-| Requisito | Quién | Día |
+| Requirement | Who | Day |
 |---|---|---|
-| Privy como componente central, no accesorio | David | 1 a 5 |
-| Al menos una billetera de Privy funcionando | David | 1 |
-| Billeteras de organización para el comercio | David | 6 |
-| Al menos un control: política de transferencia con tope | David | 6 |
-| Una transacción financiera real completada | Sebastián | 3 |
-| Explicar cómo Privy mejora el producto | Los cuatro | 8 |
+| Privy as a core component, not an accessory | David | 1 to 5 |
+| At least one Privy wallet working | David | 1 |
+| Organization wallets for the merchant | David | 6 |
+| At least one control: a transfer policy with a cap | David | 6 |
+| A real financial transaction completed | Sebastián | 3 |
+| Explain how Privy improves the product | All four | 8 |
 
-### The Graph — 10.000 USD
+### The Graph — as understood on day 4
 
-| Requisito | Quién | Día |
+| Requirement | Who | Day |
 |---|---|---|
-| Subgraph desplegado y consultable públicamente | Lucio | ✔ 4 |
-| Datos en vivo: la inferencia corre contra el subgraph | Edmer | 4 |
-| Rasgos de grafo imposibles sin índice, con la mejora medida | Edmer | 4 |
-| Devolver el razonamiento, no solo el resultado en crudo | Edmer | 4 |
-| Ranking por visitas, como consulta al subgraph | Lucio | ✔ 5 |
+| Subgraph deployed and publicly queryable | Lucio | ✔ 4 |
+| Live data: inference runs against the subgraph | Edmer | 4 |
+| Graph features impossible without an index, with the improvement measured | Edmer | 4 |
+| Return the reasoning, not just the raw result | Edmer | 4 |
+| Leaderboard by visits, as a subgraph query | Lucio | ✔ 5 |
 
 ---
 
-## El orden de sacrificio
+## The order of sacrifice
 
-Si algo se cae, está escrito de antemano:
+If something falls over, it is written down in advance:
 
-**Bucle de pago → subgraph y modelo → ranking → trivia.**
+**Payment loop → subgraph and model → leaderboard → trivia.**
 
-Si el bucle de pago falla en la demostración, nada de lo demás importa. Un jurado
-perdona una función que falta; no perdona una demo que no funciona.
+If the payment loop fails in the demonstration, nothing else matters. A jury
+forgives a missing feature; it does not forgive a demo that does not work.
 
-**Nunca se sacrifican los documentos de feedback:** valen el 25% del premio de
-World y se escriben mientras se integra, no ocupan un bloque de tiempo propio.
+**The feedback documents are never sacrificed:** they are written while
+integrating, and do not take a block of time of their own.
