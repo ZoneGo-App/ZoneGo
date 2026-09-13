@@ -183,12 +183,7 @@ export function MerchantPanel({ merchantAddress, onGoToScan }: MerchantPanelProp
 
   return (
     <div className="min-h-screen bg-bg px-4 py-6">
-      <div className="flex items-center justify-between">
-        <p className="text-xs uppercase tracking-wide text-ink-muted">Business account</p>
-        <button type="button" onClick={handleLogout} className="text-xs text-ink-muted underline">
-          Log out
-        </button>
-      </div>
+      <p className="text-xs uppercase tracking-wide text-ink-muted">Business account</p>
       <h1 className="text-2xl font-bold text-ink">{campaign.merchant_name}</h1>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -224,6 +219,14 @@ export function MerchantPanel({ merchantAddress, onGoToScan }: MerchantPanelProp
         className="mt-6 w-full rounded-full bg-brand py-3 font-medium text-white transition"
       >
         Scan a customer's QR
+      </button>
+
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="mt-3 w-full rounded-full border border-border py-3 text-sm font-medium text-ink-muted"
+      >
+        Log out
       </button>
     </div>
   )
