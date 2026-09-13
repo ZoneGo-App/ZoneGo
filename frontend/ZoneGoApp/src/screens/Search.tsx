@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
+import 'leaflet/dist/leaflet.css'
 import { searchCampaigns, formatUsd, formatDistance, type SearchHit } from '../lib/api'
+import { CampaignMap, openDirections } from '../components/CampaignMap'
 
 const RADIUS_OPTIONS_KM = [1, 5, 10] as const
 const SEARCH_DEBOUNCE_MS = 400
-const MAX_PINS_ON_MAP = 5
-
 /**
  * Delancey Street, Lower East Side — where every live campaign is. Five metres
  * from campaign 1, so it comes back at the smallest radius.
@@ -104,22 +104,6 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   return debounced
 }
 
-/**
- * Decorative pin position, not a real map projection. Spreads hits around a
- * center point based only on their rank and relative distance — there is no
- * real map tile or geocoding wired in yet, this just reserves the visual
- * space and gives a sense of "closer = nearer the middle" until a real map
- * (Google Maps, with the actual lat/lon) replaces it.
- */
-function decorativePinPosition(index: number, distanceMeters: number, maxDistance: number) {
-  const angle = (index / MAX_PINS_ON_MAP) * 2 * Math.PI - Math.PI / 2
-  const spread = maxDistance > 0 ? distanceMeters / maxDistance : 0.5
-  const radiusPercent = 18 + spread * 30
-  const topPercent = 50 + Math.sin(angle) * radiusPercent
-  const leftPercent = 50 + Math.cos(angle) * radiusPercent
-  return { top: `${topPercent}%`, left: `${leftPercent}%` }
-}
-
 interface SearchProps {
   onSelectCampaign: (hit: SearchHit) => void
 }
@@ -162,8 +146,6 @@ export function Search({ onSelectCampaign }: SearchProps) {
   }, [coords, radiusKm, debouncedQuery])
 
   const error = locationError ?? searchError
-  const mapPins = results.slice(0, MAX_PINS_ON_MAP)
-  const maxDistance = Math.max(...mapPins.map((h) => h.distance_meters), 1)
   const nothingInRange = !loading && !!coords && results.length === 0 && !searchError
 
   return (
@@ -231,46 +213,9 @@ export function Search({ onSelectCampaign }: SearchProps) {
         ))}
       </div>
 
-      {/* Decorative map placeholder — reserves the space for a real map later. */}
-      <div className="relative mt-4 h-48 w-full overflow-hidden rounded-2xl border border-border bg-[#e9e7df]">
-        <div
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage:
-              'linear-gradient(#d8d5c9 1px, transparent 1px), linear-gradient(90deg, #d8d5c9 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-          }}
-        />
-        <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-brand shadow" />
-        {mapPins.map((hit, index) => {
-          const position = decorativePinPosition(index, hit.distance_meters, maxDistance)
-          const isTopPick = hit.campaign.pays_double_today
-          return (
-            <div
-              key={hit.campaign.campaign_id}
-              className="absolute -translate-x-1/2 -translate-y-full"
-              style={position}
-            >
-              <div
-                className={`rounded-full px-2 py-1 text-xs font-semibold text-white shadow ${
-                  isTopPick ? 'bg-accent' : 'bg-brand'
-                }`}
-              >
-                {formatUsd(hit.campaign.reward_today)}
-              </div>
-              <div
-                className={`mx-auto h-2 w-2 rotate-45 ${isTopPick ? 'bg-accent' : 'bg-brand'}`}
-                style={{ marginTop: -4 }}
-              />
-            </div>
-          )
-        })}
-        {mapPins.length === 0 && !loading && (
-          <p className="absolute inset-0 flex items-center justify-center text-xs text-ink-muted">
-            Map preview — real map coming soon
-          </p>
-        )}
-      </div>
+      {coords && (
+        <CampaignMap center={coords} hits={results} onSelectCampaign={onSelectCampaign} />
+      )}
 
       {!coords && !error && (
         <p className="mt-6 text-center text-ink-muted">Finding you...</p>
@@ -302,13 +247,16 @@ export function Search({ onSelectCampaign }: SearchProps) {
         {results.map((hit) => {
           const isBoosted = hit.campaign.pays_double_today
           return (
-            <li key={hit.campaign.campaign_id}>
+            <li
+              key={hit.campaign.campaign_id}
+              className={`overflow-hidden rounded-2xl border bg-surface ${
+                isBoosted ? 'border-accent' : 'border-border'
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => onSelectCampaign(hit)}
-                className={`flex w-full items-center justify-between rounded-2xl border bg-surface px-4 py-3 text-left transition hover:border-brand ${
-                  isBoosted ? 'border-accent' : 'border-border'
-                }`}
+                className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-bg"
               >
                 <div>
                   <div className="flex items-center gap-2">
@@ -329,6 +277,13 @@ export function Search({ onSelectCampaign }: SearchProps) {
                 <p className={`text-lg font-semibold ${isBoosted ? 'text-accent' : 'text-ink'}`}>
                   {formatUsd(hit.campaign.reward_today)}
                 </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => openDirections(hit.campaign.lat, hit.campaign.lon)}
+                className="w-full border-t border-border px-4 py-2 text-left text-xs font-medium text-brand"
+              >
+                Get directions
               </button>
             </li>
           )
