@@ -1,7 +1,7 @@
 """
 Business-category ("rubro") classifier from free-text descriptions.
 
-Cheap, high-return second model (Día 3 of the plan): a merchant types a
+Cheap, high-return second model (Day 3 of the plan): a merchant types a
 free-text description when creating a campaign ("We sell empanadas and
 coffee every morning"), and this model normalizes that into one of the
 fixed categories the search filter uses — instead of forcing merchants
@@ -35,8 +35,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, f1_score, classification_report
 from sklearn.pipeline import Pipeline
 
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "rubro_classifier.joblib")
-REPORT_PATH = os.path.join(os.path.dirname(__file__), "RUBRO_REPORT.md")
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rubro_classifier.joblib")
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "RUBRO_REPORT.md")
 
 CONFIDENCE_THRESHOLD = 0.22  # see note below — recalibrated after adding "other"
 OTHER_LABEL = "other"
@@ -266,7 +266,7 @@ def train_rubro_classifier(random_state=42, test_size=0.25):
 # out-of-distribution behavior (see write_report's "Known limitation").
 _OOD_EXAMPLES = [
     "We sell running sneakers and athletic wear",
-    "zapatillas y ropa deportiva",
+    "athletic shoes and sportswear",
     "flowers and plants for your home",
     "I fix phones and sell chargers",
     "tattoo studio, walk ins welcome",
