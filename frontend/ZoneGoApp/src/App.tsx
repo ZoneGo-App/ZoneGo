@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
 import { Header } from './components/Header'
+import { MyPanel } from './screens/MyPanel'
 import { Onboarding } from './screens/Onboarding'
 import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
@@ -148,33 +149,6 @@ function BottomNav({ activeTab, onSelect }: { activeTab: NeighborTab; onSelect: 
   )
 }
 
-function MyPanelPlaceholder() {
-  const { logout } = usePrivy()
-  const { setRole } = useRole()
-
-  async function handleLogout() {
-    setRole(null)
-    localStorage.removeItem(ATTESTATION_STORAGE_KEY)
-    await logout()
-  }
-
-  return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <div>
-        <p className="text-ink">Your earnings panel isn't ready yet.</p>
-        <p className="text-sm text-ink-muted">Check back soon — this is coming.</p>
-      </div>
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="rounded-full border border-border px-6 py-2 text-sm font-medium text-ink-muted"
-      >
-        Log out
-      </button>
-    </div>
-  )
-}
-
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
@@ -294,7 +268,7 @@ function App() {
         </div>
       )
     } else if (neighborTab === 'panel') {
-      tabContent = <MyPanelPlaceholder />
+      tabContent = <MyPanel />
     } else if (neighborTab === 'ranking') {
       tabContent = <Leaderboard myAddress={visitorAddress} />
     } else {
