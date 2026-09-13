@@ -189,8 +189,6 @@ function App() {
         No wallet found for your account yet. Try signing out and back in.
       </p>
     )
-  } else if (!attestation) {
-    content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
   } else if (!visitorProfile || editingProfile) {
     content = (
       <VisitorProfileForm
@@ -205,7 +203,7 @@ function App() {
   } else {
     let tabContent: React.ReactNode
 
-    if (neighborTab === 'myqr' && selectedHit) {
+    if (neighborTab === 'myqr' && selectedHit && attestation) {
       tabContent = (
         <MyQr
           visitorAddress={visitorAddress}
@@ -213,6 +211,13 @@ function App() {
           attestation={attestation}
           onBack={handleBackFromQr}
         />
+      )
+    } else if (neighborTab === 'myqr' && selectedHit) {
+      // World verification now happens here — at the moment someone actually
+      // picks a place to claim from — instead of at the front door before
+      // they can even browse. Explore/My Panel/Ranking never required it.
+      tabContent = (
+        <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
       )
     } else if (neighborTab === 'myqr') {
       tabContent = (
