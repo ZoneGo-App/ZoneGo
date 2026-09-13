@@ -4,11 +4,11 @@ import sys
 import requests
 from fastapi import APIRouter, HTTPException
 
-# Se agrega la carpeta donde vive ESTE archivo al sys.path -- así funciona
-# sin importar cómo se llame esa carpeta (no se asume "ml/" ni ningún otro
-# nombre): basta con que infer.py, events.py, features.py y
-# graph_features.py estén junto a score.py. ZONEGO_ML_DIR permite apuntar
-# a otro lado si en algún despliegue viven separados.
+# This adds the folder where THIS file lives to sys.path -- so it works
+# no matter what that folder is called (no assumption of "ml/" or any
+# other name): it's enough for infer.py, events.py, features.py, and
+# graph_features.py to sit next to score.py. ZONEGO_ML_DIR lets you point
+# somewhere else if in some deployment they live separately.
 _SIBLINGS_DIR = os.environ.get("ZONEGO_ML_DIR", os.path.dirname(os.path.abspath(__file__)))
 if _SIBLINGS_DIR not in sys.path:
     sys.path.insert(0, _SIBLINGS_DIR)
@@ -67,10 +67,11 @@ def wallet_score(wallet: str) -> float:
         raise HTTPException(status_code=502, detail=f"Subgraph query failed: {exc}")
 
     if score is None:
-        # Ahora mismo esto va a pasar para prácticamente cualquier wallet:
-        # el subgraph desplegado todavía no tiene ni una visita indexada
-        # (bloqueado en que Sebas redespliegue los contratos, no en este
-        # código). Mientras tanto, validar contra data/visits.csv.
+        # Right now this is going to happen for practically any wallet:
+        # campaign 1 at Delancey is indexed and funded with $20, but zero
+        # visits have landed yet (waiting on Sebas to make the first one,
+        # not blocked on this code). In the meantime, validate against
+        # data/visits.csv.
         raise HTTPException(status_code=404, detail=f"No indexed visits found for {wallet}")
 
     # TODO(Lucio / whoever owns the payment tree): this is where `score`
