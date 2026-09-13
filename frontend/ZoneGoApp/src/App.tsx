@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
 import { Header } from './components/Header'
+import { InstallPrompt } from './components/InstallPrompt'
 import { BottomNav } from './components/BottomNav'
 import { ExploreIcon, QrIcon, PanelIcon, RankingIcon, ScanIcon } from './components/Icons'
 import { MyPanel } from './screens/MyPanel'
@@ -264,6 +265,7 @@ function App() {
     <>
       <Header onEditProfile={() => setEditingProfile(true)} />
       {content}
+      <InstallPrompt />
     </>
   )
 }
