@@ -58,9 +58,9 @@ import pandas as pd
 
 from features import FEATURES_ALL, add_sequential_features, fit_aggregated_features, apply_aggregated_features
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "visits.csv")
-BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "fraud_model.joblib")
-REPORT_PATH = os.path.join(os.path.dirname(__file__), "ATTACK_SIMULATION_REPORT.md")
+DATA_PATH = os.environ.get("ZONEGO_DATA_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "visits.csv"))
+BUNDLE_PATH = os.environ.get("ZONEGO_MODEL_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "fraud_model.joblib"))
+REPORT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ATTACK_SIMULATION_REPORT.md")
 
 RANDOM_STATE = 7  # own seed, distinct from generate.py/train.py
 
