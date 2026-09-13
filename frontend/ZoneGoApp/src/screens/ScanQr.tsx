@@ -210,9 +210,6 @@ export function ScanQr() {
 
         {step.kind === 'scanning' && (
           <>
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-56 w-56 rounded-3xl border-2 border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-            </div>
             <p className="absolute bottom-8 left-0 right-0 text-center text-sm text-slate-100">
               Point at the customer's QR code
             </p>
