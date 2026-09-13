@@ -14,8 +14,8 @@ dataSources:
     network: base-sepolia
     source:
       abi: CampaignVault
-      address: "0xf4ADec71da03c6595CF4624f7d4573C9EDb753B0"
-      startBlock: 46522139
+      address: "0x7b4aaDDe248818bAD121431eAd1a3A865914c419"
+      startBlock: 46725201
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -32,14 +32,24 @@ dataSources:
           handler: handleCampaignCreated
         - event: CampaignFunded(indexed uint256,indexed address,uint256)
           handler: handleCampaignFunded
+        # The three ways a campaign stops being worth walking to. Indexing the
+        # money in and not the money out left `balance` reading high forever
+        # after a merchant withdrew, and `active` reading true forever after
+        # they paused — and search sends people to whatever reads active.
+        - event: CampaignWithdrawn(indexed uint256,indexed address,uint256)
+          handler: handleCampaignWithdrawn
+        - event: CampaignPaused(indexed uint256)
+          handler: handleCampaignPaused
+        - event: CampaignUnpaused(indexed uint256)
+          handler: handleCampaignUnpaused
 
   - kind: ethereum
     name: VisitRegistry
     network: base-sepolia
     source:
       abi: VisitRegistry
-      address: "0xD33f2e26f11Fe011835D791EbA1BFE123479998A"
-      startBlock: 46522139
+      address: "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
+      startBlock: 46725201
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -69,8 +79,8 @@ dataSources:
       # Indexed from the start anyway, so the first committed epoch appears
       # without a redeploy.
       abi: FraudOracle
-      address: "0x5157504d3a9683Ca953EF5db1255dE619E110A9B"
-      startBlock: 46522139
+      address: "0xfD18B748C0868C64d0bC5a68896CF3aF1d776243"
+      startBlock: 46725201
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

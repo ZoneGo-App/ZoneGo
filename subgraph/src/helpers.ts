@@ -96,13 +96,15 @@ export function loadVisitor(address: Address, timestamp: BigInt): Visitor {
 }
 
 /**
- * A campaign should be born from CampaignCreated. The contract does not emit
- * that event yet, so we create a shell the first time a campaign is mentioned
- * and fill in what the event carries. Reward, cap, radius, geohash and zone
- * keep their empty defaults: visibly missing rather than quietly wrong.
+ * A campaign is born from CampaignCreated. A shell is still created when some
+ * other event mentions a campaign first — events within a block are handled in
+ * log order, but nothing guarantees we started indexing before the creation.
+ * Reward, cap, radius, geohash and zone keep their empty defaults in that case:
+ * visibly missing rather than quietly wrong.
  *
  * `merchant` is Address.zero() when the event does not name one — VisitRecorded
- * carries only the campaign, so the owner is whatever CampaignFunded recorded.
+ * and the pause events carry only the campaign, so the owner is whatever
+ * CampaignCreated or CampaignFunded recorded.
  */
 export function loadCampaign(
   campaignId: BigInt,

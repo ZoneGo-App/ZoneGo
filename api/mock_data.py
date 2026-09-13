@@ -5,16 +5,27 @@ ones the synthetic generator uses too, so the mock API and Edmer's dataset
 describe the same neighbourhood.
 
 Amounts are USDC minor units — 6 decimals, so 50_000 is five cents.
+
+Every store pays the same five cents and carries the same 50-visit daily cap.
+Pricing by store size was dropped on purpose: it made the big store always
+worth more than the bodega, which is the opposite of what this product is for.
+The only variation is the boost day — one day a week, any store can pay double.
 """
 
 from datetime import datetime, timedelta, timezone
 
 from api.geo import encode_geohash, zone_of
-from api.points import POINTS_NEW_MERCHANT, POINTS_PER_VISIT
+from api.points import POINTS_NEW_MERCHANT, POINTS_PER_VISIT, unix_day
 from api.schemas import Campaign, LeaderboardEntry
 from api.zones import zone_name
 
 NOW = datetime.now(timezone.utc)
+
+# What every campaign pays, and how many visits a day it will cover before the
+# cap stops it. The cap is a brake against a wallet farm, not a budget — the
+# budget is the campaign balance.
+REWARD_PER_VISIT = 50_000
+DAILY_CAP = 50
 
 
 def _campaign(**kwargs) -> Campaign:
@@ -32,13 +43,16 @@ CAMPAIGNS = [
         # The demo case: Google files this as a convenience store and would
         # never surface it for "sneakers". The owner knows better.
         sells="coffee, sandwiches, phone chargers, running sneakers, socks",
-        reward_per_visit=50_000,
-        daily_cap=60,
+        reward_per_visit=REWARD_PER_VISIT,
+        daily_cap=DAILY_CAP,
         lat=40.7185,
         lon=-73.9880,
         radius_meters=120,
         balance=48_500_000,
         created_at=NOW - timedelta(days=2),
+        # Doubling today, so the search screen and the demo always have one
+        # store worth walking to first.
+        boost_day=unix_day(),
     ),
     _campaign(
         campaign_id=2,
@@ -46,13 +60,15 @@ CAMPAIGNS = [
         merchant_name="Kim's Sneakers",
         category="footwear",
         sells="sneakers, running shoes, basketball shoes, laces",
-        reward_per_visit=150_000,
-        daily_cap=40,
+        reward_per_visit=REWARD_PER_VISIT,
+        daily_cap=DAILY_CAP,
         lat=40.7205,
         lon=-73.9885,
         radius_meters=80,
         balance=22_000_000,
         created_at=NOW - timedelta(days=1),
+        # Their boost day is three days out — the app can show it coming.
+        boost_day=unix_day() + 3,
     ),
     _campaign(
         campaign_id=3,
@@ -60,8 +76,8 @@ CAMPAIGNS = [
         merchant_name="Orchard Street Kicks",
         category="footwear",
         sells="vintage sneakers, streetwear, caps",
-        reward_per_visit=120_000,
-        daily_cap=25,
+        reward_per_visit=REWARD_PER_VISIT,
+        daily_cap=DAILY_CAP,
         lat=40.7215,
         lon=-73.9895,
         radius_meters=150,

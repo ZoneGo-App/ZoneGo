@@ -62,6 +62,18 @@ def test_a_geohash_from_another_store_is_refused():
     assert r.status_code == 409
 
 
+def test_a_nonce_sent_as_a_string_is_accepted():
+    """/qr/sign hands it over as a string, so a claim can send it back as one.
+
+    A frontend should never have to convert a value we gave it — and if it
+    tried, converting it through a JavaScript number is exactly the rounding
+    the string was there to avoid.
+    """
+    big = "12637475492468184470"
+    r = client.post("/visits/claim", json=a_claim(nonce=big))
+    assert r.status_code == 200
+
+
 def test_the_same_claim_is_idempotent_in_mock_mode():
     a = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
     b = client.post("/visits/claim", json=a_claim()).json()["tx_hash"]
@@ -83,6 +95,20 @@ ON_CHAIN = chain.OnChainCampaign(
 
 NULLIFIER = "0x" + "c3" * 32
 SUBMITTED = "0x" + "ab" * 32
+ATTESTER_SIGNATURE = "0x" + "d4" * 65
+
+
+def an_attestation(**overrides):
+    """What POST /world/verify hands back, as the claim body carries it."""
+    body = {
+        "visitor": VISITOR,
+        "nullifier_hash": NULLIFIER,
+        "expiry": int(time.time()) + 120,
+        "signature": ATTESTER_SIGNATURE,
+        "typed_data": {},
+    }
+    body.update(overrides)
+    return body
 
 
 @pytest.fixture
@@ -98,7 +124,7 @@ def live(monkeypatch):
 
 def test_a_real_campaign_is_submitted_to_the_chain(live):
     """Validated against the contract, then relayed — not the sample data."""
-    r = client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    r = client.post("/visits/claim", json=a_claim(attestation=an_attestation()))
     assert r.status_code == 200
     assert r.json()["tx_hash"] == SUBMITTED
     assert r.json()["status"] == "submitted"
@@ -107,15 +133,53 @@ def test_a_real_campaign_is_submitted_to_the_chain(live):
 def test_the_signed_fields_are_passed_through_untouched(live, monkeypatch):
     seen = {}
     monkeypatch.setattr(relay, "send_claim", lambda claim: seen.setdefault("c", claim) and SUBMITTED)
-    client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    client.post("/visits/claim", json=a_claim(attestation=an_attestation()))
     assert seen["c"].signature == SIGNATURE
     assert seen["c"].visitor == VISITOR
+    # Read off the attestation, which is where the contract reads it from too.
     assert seen["c"].nullifier_hash == NULLIFIER
+    assert seen["c"].attestation_signature == ATTESTER_SIGNATURE
 
 
-def test_a_claim_without_a_nullifier_is_refused(live):
-    """Zero would put every visitor in one weekly bucket and misprice rewards."""
+def test_a_claim_without_an_attestation_is_refused(live):
+    """No attestation means no nullifier, and a zero would misprice rewards.
+
+    Every visitor would land in one weekly bucket, so the second person to
+    claim anywhere would be paid 50% of what was their first visit.
+    """
     assert client.post("/visits/claim", json=a_claim()).status_code == 400
+
+
+def test_an_expired_attestation_is_refused_before_it_costs_gas(live):
+    """Its own clock: the QR may be fresh and the World session long over."""
+    stale = an_attestation(expiry=int(time.time()) - 1)
+    r = client.post("/visits/claim", json=a_claim(attestation=stale))
+    assert r.status_code == 410
+
+
+def test_an_attestation_for_somebody_else_is_refused(live):
+    """The contract reverts on this. Finding out here is free."""
+    someone_else = an_attestation(visitor="0x" + "e5" * 20)
+    r = client.post("/visits/claim", json=a_claim(attestation=someone_else))
+    assert r.status_code == 400
+
+
+def test_a_loose_nullifier_contradicting_the_attestation_is_refused(live):
+    """Two answers to one question, so refuse rather than pick one quietly."""
+    r = client.post(
+        "/visits/claim",
+        json=a_claim(attestation=an_attestation(), nullifier_hash="0x" + "f6" * 32),
+    )
+    assert r.status_code == 400
+
+
+def test_a_loose_nullifier_that_agrees_is_accepted(live):
+    """Redundant is not wrong: a caller sending both is only repeating itself."""
+    r = client.post(
+        "/visits/claim",
+        json=a_claim(attestation=an_attestation(), nullifier_hash=NULLIFIER),
+    )
+    assert r.status_code == 200
 
 
 def test_a_relay_failure_is_502_not_500(live, monkeypatch):
@@ -123,7 +187,7 @@ def test_a_relay_failure_is_502_not_500(live, monkeypatch):
         raise relay.RelayError("node unreachable")
 
     monkeypatch.setattr(relay, "send_claim", boom)
-    r = client.post("/visits/claim", json=a_claim(nullifier_hash=NULLIFIER))
+    r = client.post("/visits/claim", json=a_claim(attestation=an_attestation()))
     assert r.status_code == 502
 
 

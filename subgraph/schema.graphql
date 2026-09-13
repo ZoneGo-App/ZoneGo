@@ -25,7 +25,7 @@ type Campaign @entity(immutable: false) {
   id: Bytes!
   campaignId: BigInt!
   merchant: Merchant!
-  "USDC minor units paid per verified visit, before the protocol fee."
+  "USDC minor units paid per verified visit, before the weekly decay for a returning visitor."
   rewardPerVisit: BigInt!
   dailyCap: Int!
   "ASCII geohash of the store, right-padded — the same value the merchant signs."

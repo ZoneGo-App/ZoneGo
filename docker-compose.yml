@@ -19,6 +19,15 @@ services:
       SUBGRAPH_URL: "${SUBGRAPH_URL:-}"
       VISIT_REGISTRY_ADDRESS: "${VISIT_REGISTRY_ADDRESS:-0x0000000000000000000000000000000000000000}"
       CAMPAIGN_VAULT_ADDRESS: "${CAMPAIGN_VAULT_ADDRESS:-0x0000000000000000000000000000000000000000}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:3000}"
+      # Empty by default and never committed. Without them the API still reads,
+      # searches and ranks — it just cannot send a transaction or attest.
+      RELAY_PRIVATE_KEY: "${RELAY_PRIVATE_KEY:-}"
+      ATTESTER_PRIVATE_KEY: "${ATTESTER_PRIVATE_KEY:-}"
+      WORLD_APP_ID: "${WORLD_APP_ID:-}"
+      WORLD_RP_ID: "${WORLD_RP_ID:-}"
+      WORLD_RP_SIGNING_KEY: "${WORLD_RP_SIGNING_KEY:-}"
+      WORLD_ACTION: "${WORLD_ACTION:-verify-visitor}"
     volumes:
       # Live reload while developing. Production builds the image without this.
       - ./api:/app/api:ro

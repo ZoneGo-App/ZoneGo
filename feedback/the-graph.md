@@ -4,7 +4,8 @@
 
 A subgraph on base-sepolia indexing three contracts — `CampaignVault`,
 `VisitRegistry` and `FraudOracle` — into ten entities. Deployed to Subgraph
-Studio as `zone-go` v0.0.1.
+Studio as `zone-go`, currently v0.0.2, republished from block 46725201 when the
+contracts were redeployed.
 
 graph-cli 0.97.1, graph-ts 0.38.1, specVersion 1.0.0.
 
@@ -59,11 +60,44 @@ No one from The Graph team answered a single question in the
 went unanswered, including a Subgraph Studio email verification failure
 reported by another participant.
 
+**`skip` stops at 5,000, and the error says so only when you get there.** Our
+fraud pipeline first paginated visits with `first: 1000, skip: page * 1000`.
+Against our own deployed subgraph, `skip: 5000` answers and `skip: 5001` returns
+`"The skip argument must be between 0 and 5000"`. So the loader could read 6,000
+visits at most, and the 6,001st broke scoring for everyone. We moved to a cursor
+on `(timestamp, id)` with an `or:` filter, which has no ceiling and doubles as
+the incremental refresh. The limit is documented, but nothing in Studio or the
+CLI surfaces it while a subgraph is small, which is exactly when a pagination
+strategy gets chosen.
+
+**Indexing the money in and not the money out.** The first manifest handled
+`CampaignCreated` and `CampaignFunded` only. The vault also emits
+`CampaignWithdrawn`, `CampaignPaused` and `CampaignUnpaused`, and without
+handlers the index kept a withdrawn campaign's balance and a paused campaign's
+`active` flag forever. `graph codegen` built cleanly with the events missing
+from the ABI; a warning for events a contract emits that no handler covers
+would have caught it.
+
 ## Why The Graph was necessary, not decorative
 
-The graph features our fraud model relies on — co-visitation degree between
-wallets, merchant entropy per wallet, temporal concentration per campaign —
-cannot be computed without an index of the chain. The measured improvement
-between the baseline model and the graph-feature model is the evidence.
+The graph features our fraud model relies on — co-visitation between wallets,
+merchant entropy per wallet, temporal concentration, and a Sybil signal for one
+nullifier behind many wallets — cannot be computed from a single transaction.
+They are properties of the whole visit graph, and without an index they do not
+exist.
 
-_(numbers pending — Edmer)_
+The evidence is one comparison, reproduced from `data_scientist/train.py` on
+branch `feat/data-scientist` against its committed synthetic dataset (20,000
+visits, 8% fraud, 80/20 stratified split), Gradient Boosting in both rows:
+
+| Graph features computed from | F1-macro | Fraud recall |
+|---|---:|---:|
+| A reference frozen at training time | 0.8571 | 70.63% |
+| A reference refreshed from the indexed visits | 0.9570 | 96.88% |
+
+A Sybil wallet is new by design, so a reference taken once never sees it.
+Refreshing that reference from the subgraph is what closes the gap, and it is
+why the loader reads the index rather than a snapshot.
+
+The honest limit: these numbers are on synthetic data. The live subgraph has
+campaigns but no claimed visits yet, so the model has not scored a real one.

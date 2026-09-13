@@ -1,0 +1,61 @@
+# Render blueprint. Point Render at this repository and it reads this file:
+# no build settings to fill in by hand, and the same config every time.
+#
+#   https://dashboard.render.com  ->  New  ->  Blueprint
+#
+# The free plan sleeps after fifteen minutes of no traffic and takes about a
+# minute to wake. A judge clicking a link should not wait a minute, so pair this
+# with a free uptime check hitting /health every ten minutes — that keeps it warm
+# and gives us the alerting the plan asks for, from one setup.
+services:
+  - type: web
+    name: zonego-api
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    # The app imports itself as `api.main`, so the package has to sit one level
+    # below the working dir — the build context is the repository root.
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: MOCK_MODE
+        value: "false"
+      - key: RPC_URL
+        value: https://sepolia.base.org
+      - key: SUBGRAPH_URL
+        value: https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2
+      - key: CAMPAIGN_VAULT_ADDRESS
+        value: "0x7b4aaDDe248818bAD121431eAd1a3A865914c419"
+      - key: VISIT_REGISTRY_ADDRESS
+        value: "0xed168b6B9c96f59Be1AD3866F24e8851D3Afca4e"
+      - key: WORLD_ACTION
+        value: verify-visitor
+      # The oracle exists now, so it sits here with the other two rather than in
+      # the dashboard: an address is public, and all three were deployed in the
+      # same block and change together.
+      - key: FRAUD_ORACLE_ADDRESS
+        value: "0xfD18B748C0868C64d0bC5a68896CF3aF1d776243"
+      # `sync: false` means Render asks for the value in the dashboard instead of
+      # reading it from here. Anything secret goes in this list and nowhere else
+      # — this file is committed.
+      - key: WORLD_APP_ID
+        sync: false
+      - key: WORLD_RP_ID
+        sync: false
+      - key: WORLD_RP_SIGNING_KEY
+        sync: false
+      - key: ATTESTER_PRIVATE_KEY
+        sync: false
+      - key: RELAY_PRIVATE_KEY
+        sync: false
+      # Signs commitEpoch. Set it to the same value as RELAY_PRIVATE_KEY: it
+      # has its own name so it can be split later without a code change, but
+      # every key here is read from one environment by one process, so a
+      # separate one would not separate much.
+      - key: FRAUD_OPERATOR_PRIVATE_KEY
+        sync: false
+      # The deployed frontend lives on another domain, so without this the
+      # browser blocks every request David makes.
+      - key: CORS_ORIGINS
+        sync: false
