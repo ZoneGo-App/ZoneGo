@@ -9,6 +9,7 @@ An uptime check points at `/health`. A person debugging points at `/ready`.
 """
 
 import httpx
+from eth_account import Account
 from fastapi import APIRouter
 from web3 import Web3
 from web3.exceptions import Web3Exception
@@ -47,21 +48,42 @@ def ready():
     checks = {
         "subgraph": _subgraph(config),
         "node": _node(config),
-        "relay_key": "configured" if config.relay_private_key else "missing",
-        "attester_key": "configured" if config.attester_private_key else "missing",
-        "operator_key": (
-            "configured" if config.fraud_operator_private_key else "missing"
-        ),
+        "relay_key": _key(config.relay_private_key),
+        "attester_key": _key(config.attester_private_key),
+        "operator_key": _key(config.fraud_operator_private_key),
         "world_rp": "configured" if config.world_rp_id else "missing",
-        "vault_address": "set" if config.campaign_vault_address != ZERO else "unset",
-        "registry_address": "set" if config.visit_registry_address != ZERO else "unset",
-        "oracle_address": "set" if config.fraud_oracle_address != ZERO else "unset",
+        "vault_address": _address(config.campaign_vault_address),
+        "registry_address": _address(config.visit_registry_address),
+        "oracle_address": _address(config.fraud_oracle_address),
     }
 
     # A missing key is not an outage — the API still reads and still signs QR
     # payloads. What makes it not ready is being unable to answer at all.
     ready_now = checks["subgraph"] == "ok" and checks["node"] == "ok"
     return {"ready": ready_now, "mock_mode": False, "checks": checks}
+
+
+def _key(value: str) -> str:
+    """Whether a private key is there, and whether it is one.
+
+    "configured" used to mean only "not empty". A relay key that reached the
+    host malformed read as configured here while every claim failed with a 500,
+    which is the exact case this endpoint exists to catch. Parsing it costs
+    nothing and says nothing about the key beyond whether it parses.
+    """
+    if not value:
+        return "missing"
+    try:
+        Account.from_key(value)
+    except Exception:  # noqa: BLE001 — any parse failure is the same answer
+        return "invalid"
+    return "configured"
+
+
+def _address(value: str) -> str:
+    if value == ZERO:
+        return "unset"
+    return "set" if Web3.is_address(value) else "invalid"
 
 
 @router.get("/metrics")

@@ -164,10 +164,26 @@ class Config(BaseSettings):
     # request captured off the network is dead before it is worth replaying.
     merchant_profile_signature_window_seconds: int = 600
 
-    @field_validator("subgraph_url", "rpc_url", "world_api_url", mode="before")
+    @field_validator(
+        "subgraph_url",
+        "rpc_url",
+        "world_api_url",
+        "relay_private_key",
+        "attester_private_key",
+        "fraud_operator_private_key",
+        "world_rp_signing_key",
+        "campaign_vault_address",
+        "visit_registry_address",
+        "fraud_oracle_address",
+        mode="before",
+    )
     @classmethod
     def _trim(cls, value):
-        """A URL pasted into a dashboard field arrives with what came with it.
+        """A value pasted into a dashboard field arrives with what came with it.
+
+        URLs, keys and addresses alike. A key with a trailing newline does not
+        fail at boot; it fails at the first claim, as a 500, while /ready still
+        calls it configured.
 
         A trailing newline is the expensive one. httpx raises InvalidURL for it,
         and InvalidURL does not inherit from httpx.HTTPError — so the handler

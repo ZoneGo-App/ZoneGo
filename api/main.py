@@ -81,7 +81,29 @@ async def throttle_and_count(request: Request, call_next):
                 headers={"Retry-After": str(int(wait) + 1)},
             )
 
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:  # noqa: BLE001 — the last place anything can still be answered properly
+        # Starlette turns an unhandled exception into its 500 in
+        # ServerErrorMiddleware, which sits outside every middleware added with
+        # add_middleware — CORS included. That 500 left without CORS headers,
+        # so the browser discarded it and the frontend saw "Failed to fetch"
+        # instead of a status and a message. A claim that failed on the server
+        # looked exactly like the network being down.
+        #
+        # Answering here, inside CORS, gets the headers back on. The body says
+        # nothing specific on purpose: an unexpected error is exactly the one
+        # whose message nobody has checked is safe to show. The traceback goes
+        # to the log, where the host keeps it.
+        observability.log.exception(
+            "unhandled_error",
+            extra={"path": request.url.path, "method": request.method},
+        )
+        observability.record_response(500)
+        return JSONResponse(
+            {"detail": "Internal error. It has been logged; try again, or report it with the time."},
+            status_code=500,
+        )
     observability.record_response(response.status_code)
     return response
 

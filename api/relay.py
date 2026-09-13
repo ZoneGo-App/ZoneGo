@@ -19,6 +19,7 @@ over the visit, and the attester's over what World answered.
 
 from dataclasses import dataclass
 
+import requests
 from eth_account import Account
 from web3 import Web3
 from web3.exceptions import Web3Exception
@@ -120,11 +121,21 @@ def send_claim(claim: Claim) -> str:
             request_kwargs={"timeout": config.rpc_timeout_seconds},
         )
     )
-    account = Account.from_key(config.relay_private_key)
-    registry = w3.eth.contract(
-        address=Web3.to_checksum_address(config.visit_registry_address),
-        abi=VISIT_REGISTRY_ABI,
-    )
+
+    # Both of these used to sit outside the try below. A key or an address that
+    # reached the host malformed raised ValueError, which is not a Web3Exception,
+    # so it escaped as a bare 500 on every claim while /ready reported the key as
+    # configured. Neither message repeats the value: one of them is a private key.
+    try:
+        account = Account.from_key(config.relay_private_key)
+    except Exception as exc:  # noqa: BLE001 — any failure to parse a key is the same answer
+        raise RelayError("RELAY_PRIVATE_KEY is not a valid private key") from exc
+    try:
+        registry_address = Web3.to_checksum_address(config.visit_registry_address)
+    except Exception as exc:  # noqa: BLE001
+        raise RelayError("VISIT_REGISTRY_ADDRESS is not a valid address") from exc
+
+    registry = w3.eth.contract(address=registry_address, abi=VISIT_REGISTRY_ABI)
 
     # The visitor travels inside the signed struct now, not beside it. The
     # relay cannot swap it for an address of its own without the merchant's
@@ -155,3 +166,9 @@ def send_claim(claim: Claim) -> str:
         # Never let the underlying error carry the key or the signed payload
         # into a response body; only what the node said is safe to repeat.
         raise RelayError(f"relay failed: {exc}") from exc
+    except requests.exceptions.RequestException as exc:
+        # The node refusing the HTTP request itself — a rate limit, a 5xx, a
+        # timeout. web3 lets these through as requests errors, not
+        # Web3Exceptions, so without this they were 500s too. The type is
+        # enough to act on, and unlike the message it cannot carry a URL.
+        raise RelayError(f"could not reach the node ({type(exc).__name__})") from exc
