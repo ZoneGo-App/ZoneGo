@@ -35,9 +35,6 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
         setSigned(result)
         setError(null)
         setSecondsLeft(result.rotate_after_seconds)
-        // Schedule the next refresh using the interval the server actually
-        // returned, not a value assumed ahead of time — this used to read
-        // `signed` from a stale closure and always fell back to 30s.
         refreshTimeout = setTimeout(fetchQr, result.rotate_after_seconds * 1000)
       } catch (err) {
         if (!cancelled) {
@@ -90,7 +87,7 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
         {signed && (
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <QRCodeSVG
-              value={JSON.stringify({ typedData: signed.typed_data, attestation })}
+              value={JSON.stringify({ message: signed.typed_data.message, attestation })}
               size={220}
             />
           </div>
@@ -103,7 +100,7 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
             type="button"
             onClick={() => {
               navigator.clipboard.writeText(
-                JSON.stringify({ typedData: signed.typed_data, attestation }),
+                JSON.stringify({ message: signed.typed_data.message, attestation }),
               )
             }}
             className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-ink-muted"

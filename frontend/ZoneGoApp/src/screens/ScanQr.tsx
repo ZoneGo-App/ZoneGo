@@ -2,8 +2,39 @@ import { useEffect, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useSignTypedData } from '@privy-io/react-auth'
 import { claimVisit, type QrSignResponse, type WorldAttestation } from '../lib/api'
+import { VISIT_REGISTRY_ADDRESS, BASE_SEPOLIA_CHAIN_ID } from '../lib/contracts'
 
 const SCANNER_ELEMENT_ID = 'scan-qr-reader'
+
+/**
+ * Fixed for every visit, to every merchant — only `message` actually
+ * changes per scan. Reconstructing this here instead of reading it off the
+ * QR cuts the payload by roughly a third, which is the difference between
+ * a code a phone camera can read off a screen and one it can't. Must match
+ * what /qr/sign issues exactly, or a signature made from this shape will
+ * not match what the contract expects.
+ */
+const VISIT_SIG_TYPES: QrSignResponse['typed_data']['types'] = {
+  EIP712Domain: [
+    { name: 'name', type: 'string' },
+    { name: 'version', type: 'string' },
+    { name: 'chainId', type: 'uint256' },
+    { name: 'verifyingContract', type: 'address' },
+  ],
+  VisitSig: [
+    { name: 'campaignId', type: 'uint256' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'expiry', type: 'uint64' },
+    { name: 'geohash', type: 'bytes32' },
+    { name: 'visitor', type: 'address' },
+  ],
+}
+const VISIT_SIG_DOMAIN = {
+  name: 'ZoneGo',
+  version: '1',
+  chainId: BASE_SEPOLIA_CHAIN_ID,
+  verifyingContract: VISIT_REGISTRY_ADDRESS,
+}
 
 const DEMO_ERRORS = [
   'QR expired',
@@ -45,10 +76,16 @@ export function ScanQr() {
         (decodedText) => {
           try {
             const parsed = JSON.parse(decodedText) as {
-              typedData: QrSignResponse['typed_data']
+              message: QrSignResponse['typed_data']['message']
               attestation: WorldAttestation
             }
-            setStep({ kind: 'decoded', typedData: parsed.typedData, attestation: parsed.attestation })
+            const typedData: QrSignResponse['typed_data'] = {
+              types: VISIT_SIG_TYPES,
+              primaryType: 'VisitSig',
+              domain: VISIT_SIG_DOMAIN,
+              message: parsed.message,
+            }
+            setStep({ kind: 'decoded', typedData, attestation: parsed.attestation })
           } catch {
             setStep({ kind: 'error', message: 'That QR code is not a valid ZoneGo code.' })
           }
@@ -172,10 +209,16 @@ export function ScanQr() {
                   onChange={(e) => {
                     try {
                       const parsed = JSON.parse(e.target.value) as {
-                        typedData: QrSignResponse['typed_data']
+                        message: QrSignResponse['typed_data']['message']
                         attestation: WorldAttestation
                       }
-                      setStep({ kind: 'decoded', typedData: parsed.typedData, attestation: parsed.attestation })
+                      const typedData: QrSignResponse['typed_data'] = {
+                        types: VISIT_SIG_TYPES,
+                        primaryType: 'VisitSig',
+                        domain: VISIT_SIG_DOMAIN,
+                        message: parsed.message,
+                      }
+                      setStep({ kind: 'decoded', typedData, attestation: parsed.attestation })
                     } catch {
                       // Still typing/pasting — ignore until it's valid JSON.
                     }
