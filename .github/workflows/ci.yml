@@ -23,7 +23,13 @@ jobs:
   contracts:
     runs-on: ubuntu-latest
     steps:
+      # forge-std and openzeppelin-contracts are submodules, so a plain
+      # checkout leaves contracts/lib/ empty and forge test fails on an import
+      # rather than on anything real. This only started mattering once
+      # contracts/ reached this branch and the step below stopped skipping.
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Look for contracts
         id: look
