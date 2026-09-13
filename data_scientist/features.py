@@ -159,4 +159,3 @@ def apply_aggregated_features(df: pd.DataFrame, fitted: dict) -> pd.DataFrame:
     df['wallet_farm_signal'] = df['sybil_score'] * (1 + df['covisit_partners'])
 
     return df
-
