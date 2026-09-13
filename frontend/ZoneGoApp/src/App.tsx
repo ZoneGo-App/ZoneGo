@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
 import { Header } from './components/Header'
+import { BottomNav } from './components/BottomNav'
+import { ExploreIcon, QrIcon, PanelIcon, RankingIcon, ScanIcon } from './components/Icons'
 import { MyPanel } from './screens/MyPanel'
 import { Onboarding } from './screens/Onboarding'
 import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
 import { ScanQr } from './screens/ScanQr'
 import { MerchantPanel } from './screens/MerchantPanel'
+import { MerchantRanking } from './screens/MerchantRanking'
 import { MerchantProfileForm } from './screens/MerchantProfileForm'
 import { VisitorProfileForm } from './screens/VisitorProfileForm'
 import { IdentityCheck } from './screens/IdentityCheck'
@@ -23,6 +26,7 @@ import {
 const ATTESTATION_STORAGE_KEY = 'zonego_attestation'
 
 type NeighborTab = 'explore' | 'myqr' | 'panel' | 'ranking'
+type MerchantTab = 'scan' | 'panel' | 'ranking'
 
 /**
  * Reads a previously stored attestation, but only if it hasn't expired.
@@ -74,81 +78,6 @@ function RoleFallback() {
   )
 }
 
-function ExploreIcon({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-      <path d="M20 20l-4.3-4.3" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function QrIcon({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-      <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-      <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-      <path d="M14 14h3v3h-3zM19 19h2v2h-2z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function PanelIcon({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <circle cx="12" cy="8" r="3.5" stroke="currentColor" strokeWidth={active ? 2.5 : 2} />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" stroke="currentColor" strokeWidth={active ? 2.5 : 2} strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function RankingIcon({ active }: { active: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-      <path
-        d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0V4ZM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3"
-        stroke="currentColor"
-        strokeWidth={active ? 2.5 : 2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function BottomNav({ activeTab, onSelect }: { activeTab: NeighborTab; onSelect: (t: NeighborTab) => void }) {
-  const tabs: { id: NeighborTab; label: string; Icon: typeof ExploreIcon }[] = [
-    { id: 'explore', label: 'Explore', Icon: ExploreIcon },
-    { id: 'myqr', label: 'My QR', Icon: QrIcon },
-    { id: 'panel', label: 'My Panel', Icon: PanelIcon },
-    { id: 'ranking', label: 'Ranking', Icon: RankingIcon },
-  ]
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)]">
-      <div className="mx-auto flex max-w-md items-center justify-around px-2 py-2">
-        {tabs.map(({ id, label, Icon }) => {
-          const isActive = activeTab === id
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onSelect(id)}
-              className={`flex flex-col items-center gap-1 rounded-xl px-3 py-1.5 ${
-                isActive ? 'text-brand' : 'text-ink-muted'
-              }`}
-            >
-              <Icon active={isActive} />
-              <span className="text-[11px] font-medium">{label}</span>
-            </button>
-          )
-        })}
-      </div>
-    </nav>
-  )
-}
-
 function App() {
   const { ready, authenticated, user } = usePrivy()
   const { role } = useRole()
@@ -156,10 +85,11 @@ function App() {
     readStoredAttestation,
   )
   const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null)
-  const [merchantView, setMerchantView] = useState<'panel' | 'scan'>('panel')
   const [neighborTab, setNeighborTab] = useState<NeighborTab>('explore')
+  const [merchantTab, setMerchantTab] = useState<MerchantTab>('panel')
   const [merchantProfile, setMerchantProfile] = useState<MerchantProfile | null>(null)
   const [visitorProfile, setVisitorProfile] = useState<VisitorProfile | null>(null)
+  const [editingProfile, setEditingProfile] = useState(false)
 
   const merchantAddress = import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''
   const visitorAddress = user?.wallet?.address
@@ -216,20 +146,42 @@ function App() {
           No wallet found for your account yet. Try signing out and back in.
         </p>
       )
-    } else if (!merchantProfile) {
+    } else if (!merchantProfile || editingProfile) {
       content = (
-        <MerchantProfileForm merchantAddress={merchantAddress} onComplete={setMerchantProfile} />
+        <MerchantProfileForm
+          merchantAddress={merchantAddress}
+          initialProfile={merchantProfile}
+          onComplete={(profile) => {
+            setMerchantProfile(profile)
+            setEditingProfile(false)
+          }}
+        />
       )
     } else {
-      // Merchant side — unchanged: panel + scan, no bottom nav (doesn't map
-      // cleanly onto a role that scans QRs rather than showing its own).
-      // MerchantPanel now carries its own "Log out" next to "Business account".
-      content =
-        merchantView === 'scan' ? (
-          <ScanQr />
-        ) : (
-          <MerchantPanel merchantAddress={merchantAddress} onGoToScan={() => setMerchantView('scan')} />
-        )
+      let merchantTabContent: React.ReactNode
+
+      if (merchantTab === 'scan') {
+        merchantTabContent = <ScanQr />
+      } else if (merchantTab === 'ranking') {
+        merchantTabContent = <MerchantRanking />
+      } else {
+        merchantTabContent = <MerchantPanel merchantAddress={merchantAddress} />
+      }
+
+      content = (
+        <div className="pb-20">
+          {merchantTabContent}
+          <BottomNav
+            tabs={[
+              { id: 'scan', label: 'Scan', Icon: ScanIcon },
+              { id: 'panel', label: 'My Panel', Icon: PanelIcon },
+              { id: 'ranking', label: 'Ranking', Icon: RankingIcon },
+            ]}
+            activeTab={merchantTab}
+            onSelect={setMerchantTab}
+          />
+        </div>
+      )
     }
   } else if (!visitorAddress) {
     content = (
@@ -239,8 +191,17 @@ function App() {
     )
   } else if (!attestation) {
     content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
-  } else if (!visitorProfile) {
-    content = <VisitorProfileForm visitorAddress={visitorAddress} onComplete={setVisitorProfile} />
+  } else if (!visitorProfile || editingProfile) {
+    content = (
+      <VisitorProfileForm
+        visitorAddress={visitorAddress}
+        initialProfile={visitorProfile}
+        onComplete={(profile) => {
+          setVisitorProfile(profile)
+          setEditingProfile(false)
+        }}
+      />
+    )
   } else {
     let tabContent: React.ReactNode
 
@@ -278,14 +239,23 @@ function App() {
     content = (
       <div className="pb-20">
         {tabContent}
-        <BottomNav activeTab={neighborTab} onSelect={setNeighborTab} />
+        <BottomNav
+          tabs={[
+            { id: 'explore', label: 'Explore', Icon: ExploreIcon },
+            { id: 'myqr', label: 'My QR', Icon: QrIcon },
+            { id: 'panel', label: 'My Panel', Icon: PanelIcon },
+            { id: 'ranking', label: 'Ranking', Icon: RankingIcon },
+          ]}
+          activeTab={neighborTab}
+          onSelect={setNeighborTab}
+        />
       </div>
     )
   }
 
   return (
     <>
-      <Header />
+      <Header onEditProfile={() => setEditingProfile(true)} />
       {content}
     </>
   )

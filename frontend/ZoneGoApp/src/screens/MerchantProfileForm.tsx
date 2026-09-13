@@ -3,13 +3,18 @@ import { saveMerchantProfile, type MerchantProfile } from '../lib/profile'
 
 interface MerchantProfileFormProps {
   merchantAddress: string
+  initialProfile?: MerchantProfile | null
   onComplete: (profile: MerchantProfile) => void
 }
 
-export function MerchantProfileForm({ merchantAddress, onComplete }: MerchantProfileFormProps) {
-  const [name, setName] = useState('')
-  const [address, setAddress] = useState('')
-  const [description, setDescription] = useState('')
+export function MerchantProfileForm({
+  merchantAddress,
+  initialProfile,
+  onComplete,
+}: MerchantProfileFormProps) {
+  const [name, setName] = useState(initialProfile?.name ?? '')
+  const [address, setAddress] = useState(initialProfile?.address ?? '')
+  const [description, setDescription] = useState(initialProfile?.description ?? '')
   const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(e: FormEvent) {
@@ -29,7 +34,9 @@ export function MerchantProfileForm({ merchantAddress, onComplete }: MerchantPro
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-bg px-6 py-10">
-      <h1 className="text-xl font-bold text-ink">Tell us about your business</h1>
+      <h1 className="text-xl font-bold text-ink">
+        {initialProfile ? 'Edit your business profile' : 'Tell us about your business'}
+      </h1>
       <p className="mt-1 text-sm text-ink-muted">
         This is what neighbors will see when they find you nearby.
       </p>
@@ -74,7 +81,7 @@ export function MerchantProfileForm({ merchantAddress, onComplete }: MerchantPro
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button type="submit" className="mt-2 rounded-full bg-brand py-3 font-medium text-white">
-          Continue
+          {initialProfile ? 'Save' : 'Continue'}
         </button>
       </form>
     </div>

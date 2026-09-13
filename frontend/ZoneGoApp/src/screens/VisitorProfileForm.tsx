@@ -3,12 +3,17 @@ import { saveVisitorProfile, type VisitorProfile } from '../lib/profile'
 
 interface VisitorProfileFormProps {
   visitorAddress: string
+  initialProfile?: VisitorProfile | null
   onComplete: (profile: VisitorProfile) => void
 }
 
-export function VisitorProfileForm({ visitorAddress, onComplete }: VisitorProfileFormProps) {
-  const [name, setName] = useState('')
-  const [nickname, setNickname] = useState('')
+export function VisitorProfileForm({
+  visitorAddress,
+  initialProfile,
+  onComplete,
+}: VisitorProfileFormProps) {
+  const [name, setName] = useState(initialProfile?.name ?? '')
+  const [nickname, setNickname] = useState(initialProfile?.nickname ?? '')
   const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(e: FormEvent) {
@@ -27,7 +32,9 @@ export function VisitorProfileForm({ visitorAddress, onComplete }: VisitorProfil
 
   return (
     <div className="flex min-h-screen flex-col justify-center bg-bg px-6 py-10">
-      <h1 className="text-xl font-bold text-ink">Pick a name for the leaderboard</h1>
+      <h1 className="text-xl font-bold text-ink">
+        {initialProfile ? 'Edit your profile' : 'Pick a name for the leaderboard'}
+      </h1>
       <p className="mt-1 text-sm text-ink-muted">This is how other explorers will see you.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
@@ -56,7 +63,7 @@ export function VisitorProfileForm({ visitorAddress, onComplete }: VisitorProfil
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <button type="submit" className="mt-2 rounded-full bg-brand py-3 font-medium text-white">
-          Continue
+          {initialProfile ? 'Save' : 'Continue'}
         </button>
       </form>
     </div>
