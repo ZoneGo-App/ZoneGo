@@ -2,38 +2,23 @@
 #
 # pip install -r requirements.txt
 #
-# Use EXACT versions (==), not ">=": a .joblib file serializes internal
-# objects from pandas/sklearn/numpy, and those internal formats change
-# between versions (e.g., StringDtype changed its representation between
-# pandas 2.x and 3.x). With ">=", different users might install a version
-# other than the one used to generate the model, causing the .joblib file
-# to fail to load on another machine—this has happened before. That is
-# also why no .joblib files are committed to the repo (see the "How to
-# regenerate the model" section below): this eliminates the problem
-# entirely, rather than just mitigating it via version pinning.
-#
-# Exact versions obtained using `pip freeze` in the environment where
-# this pipeline was generated and tested (python3 generate.py &&
-# python3 train.py run end-to-end; see README.md):
+# EXACT versions (==), not ">=": a .joblib serializes internal
+# pandas/sklearn/numpy objects, and those internal formats change between
+# versions. That's also why NO .joblib is committed to the repo — it gets
+# regenerated on each machine with `python3 train.py` (~40s), and the
+# compatibility problem disappears entirely instead of just being mitigated.
 pandas==3.0.2
 numpy==2.4.4
 scikit-learn==1.8.0
 joblib==1.5.3
 requests==2.33.1
 
-# fastapi/uvicorn (only needed for score.py, the API -- not for
-# training or generating data): I don't have them installed in the environment
-# where I tested the rest, so I can't give you an exact version
-# validated by me. Install them, run `pip freeze | grep -iE "fastapi|uvicorn"`
-# once, and pin those two lines with == just like above —
-# same reason, although here the risk is lower (they don't serialize anything in the
-# .joblib).
+# fastapi/uvicorn (only needed for score.py, the API): pin these two with
+# == after installing once, same criterion as above.
 fastapi>=0.110
 uvicorn>=0.29
 
 # --------------------------------------------------------------------
-# How to regenerate fraud_model.joblib (intentionally excluded from the repo):
+# How to regenerate fraud_model.joblib (not in the repo, on purpose):
 #   python3 generate.py   # creates visits.csv (~20,000 rows, a few seconds)
 #   python3 train.py      # trains and saves fraud_model.joblib (~40 seconds)
-# With the exact versions listed above installed, the result is
-# reproducible on any machine without relying on a shared binary.
