@@ -259,6 +259,9 @@ export function Search({ onSelectCampaign }: SearchProps) {
                       <span className="ml-2 font-medium text-accent">pays more</span>
                     )}
                   </p>
+                  {hit.campaign.sells && (
+                    <p className="mt-0.5 text-xs text-ink-muted">{hit.campaign.sells}</p>
+                  )}
                 </div>
                 <p className={`text-lg font-semibold ${isBoosted ? 'text-accent' : 'text-ink'}`}>
                   {formatUsd(hit.campaign.reward_today)}

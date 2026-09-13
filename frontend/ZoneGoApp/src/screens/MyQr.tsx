@@ -97,6 +97,22 @@ export function MyQr({ visitorAddress, campaign, attestation, onBack }: MyQrProp
         )}
       </div>
 
+      {import.meta.env.DEV && signed && (
+        <div className="mt-3 flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(
+                JSON.stringify({ typedData: signed.typed_data, attestation }),
+              )
+            }}
+            className="rounded-full border border-border px-4 py-1.5 text-xs font-medium text-ink-muted"
+          >
+            Dev only: copy QR data
+          </button>
+        </div>
+      )}
+
       {signed && (
         <>
           <div className="mt-6 flex justify-center">

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import { useSignMessage } from '@privy-io/react-auth'
 import { saveMerchantProfile, type MerchantProfile } from '../lib/profile'
-import { saveMerchantProfileRemote } from '../lib/api'
+import { merchantProfileMessage, saveMerchantProfileRemote } from '../lib/api'
 
 interface MerchantProfileFormProps {
   merchantAddress: string
@@ -17,6 +18,7 @@ export function MerchantProfileForm({
   const [address, setAddress] = useState(initialProfile?.address ?? '')
   const [description, setDescription] = useState(initialProfile?.description ?? '')
   const [error, setError] = useState<string | null>(null)
+  const { signMessage } = useSignMessage()
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -30,14 +32,30 @@ export function MerchantProfileForm({
       description: description.trim(),
     }
     saveMerchantProfile(merchantAddress, profile)
-    // Best-effort — see saveMerchantProfileRemote's docstring. Doesn't
-    // block onComplete either way, since the endpoint doesn't exist on
-    // the backend yet.
-    saveMerchantProfileRemote({
+
+    // The API only takes a profile signed by the wallet it names. Sign exactly
+    // the values being sent — the trimmed ones above — or the signature will
+    // not match. Best-effort: dismissing the prompt still keeps the local
+    // profile, the store just won't show its name to others yet.
+    const issuedAt = Math.floor(Date.now() / 1000)
+    const message = merchantProfileMessage({
       wallet: merchantAddress,
       name: profile.name,
       description: profile.description,
+      issuedAt,
     })
+    signMessage({ message })
+      .then(({ signature }) =>
+        saveMerchantProfileRemote({
+          wallet: merchantAddress,
+          name: profile.name,
+          description: profile.description,
+          issuedAt,
+          signature,
+        }),
+      )
+      .catch((err) => console.warn('[ZoneGo] profile signature dismissed or failed:', err))
+
     onComplete(profile)
   }
 

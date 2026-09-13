@@ -21,12 +21,54 @@ interface MerchantPanelProps {
 const SEED_CAMPAIGN_CALLDATA =
   '0x4247c05a000000000000000000000000000000000000000000000000000000000000c350000000000000000000000000000000000000000000000000000000000000003264723572736b65640000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078'
 
+/**
+ * OpenStreetMap's free geocoder — no API key, unlike Google's. Its usage
+ * policy caps public requests at 1/second and asks for a descriptive
+ * User-Agent, which browser fetch() cannot set (browsers own that header).
+ * Fine for someone manually searching an address a handful of times; not
+ * meant for automated or high-volume lookups.
+ */
+async function geocodeAddress(query: string): Promise<{ lat: number; lon: number } | null> {
+  const url = new URL('https://nominatim.openstreetmap.org/search')
+  url.searchParams.set('q', query)
+  url.searchParams.set('format', 'json')
+  url.searchParams.set('limit', '1')
+  const res = await fetch(url)
+  if (!res.ok) return null
+  const results = await res.json()
+  if (!results.length) return null
+  return { lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) }
+}
+
 function CreateCampaignButton({ merchantAddress, onCreated }: { merchantAddress: string; onCreated: () => void }) {
   const { sendTransaction } = useSendTransaction()
   const [status, setStatus] = useState<'idle' | 'locating' | 'sending' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [addressQuery, setAddressQuery] = useState('')
 
-  async function handleCreate() {
+  async function createAt(coords: { lat: number; lon: number }) {
+    try {
+      setStatus('sending')
+      const geohash = encodeGeohash(coords.lat, coords.lon)
+      // Same reward/cap/radius as the Delancey demo campaign — a real
+      // "set your own economics" form is a fast follow, not today's fix.
+      await sendTransaction(
+        {
+          to: CAMPAIGN_VAULT_ADDRESS,
+          chainId: BASE_SEPOLIA_CHAIN_ID,
+          data: encodeCreateCampaign(50_000n, 50n, geohash, 120n),
+        },
+        { address: merchantAddress },
+      )
+      setStatus('idle')
+      onCreated()
+    } catch (err) {
+      setStatus('error')
+      setError(err instanceof Error ? err.message : 'Creating the campaign failed')
+    }
+  }
+
+  function handleUseMyLocation() {
     setError(null)
     setStatus('locating')
 
@@ -37,32 +79,25 @@ function CreateCampaignButton({ merchantAddress, onCreated }: { merchantAddress:
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          setStatus('sending')
-          const geohash = encodeGeohash(pos.coords.latitude, pos.coords.longitude)
-          // Same reward/cap/radius as the Delancey demo campaign — a real
-          // "set your own economics" form is a fast follow, not today's fix.
-          await sendTransaction(
-            {
-              to: CAMPAIGN_VAULT_ADDRESS,
-              chainId: BASE_SEPOLIA_CHAIN_ID,
-              data: encodeCreateCampaign(50_000n, 50n, geohash, 120n),
-            },
-            { address: merchantAddress },
-          )
-          setStatus('idle')
-          onCreated()
-        } catch (err) {
-          setStatus('error')
-          setError(err instanceof Error ? err.message : 'Creating the campaign failed')
-        }
-      },
+      (pos) => createAt({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
       () => {
         setStatus('error')
         setError("Couldn't get your location. Turn on location and try again.")
       },
     )
+  }
+
+  async function handleSearchAddress() {
+    if (!addressQuery.trim()) return
+    setError(null)
+    setStatus('locating')
+    const coords = await geocodeAddress(addressQuery.trim())
+    if (!coords) {
+      setStatus('error')
+      setError("Couldn't find that address. Try adding city and country.")
+      return
+    }
+    createAt(coords)
   }
 
   return (
@@ -73,14 +108,34 @@ function CreateCampaignButton({ merchantAddress, onCreated }: { merchantAddress:
       </p>
       <button
         type="button"
-        onClick={handleCreate}
+        onClick={handleUseMyLocation}
         disabled={status === 'locating' || status === 'sending'}
         className="rounded-full bg-brand px-5 py-2.5 text-sm font-medium text-white transition disabled:opacity-50"
       >
-        {status === 'locating' && 'Finding your location...'}
+        {status === 'locating' && 'Finding...'}
         {status === 'sending' && 'Creating...'}
-        {(status === 'idle' || status === 'error') && 'Create campaign at my location'}
+        {(status === 'idle' || status === 'error') && 'Use my current location'}
       </button>
+
+      <p className="mt-4 mb-2 text-xs text-ink-muted">Or search an address instead</p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={addressQuery}
+          onChange={(e) => setAddressQuery(e.target.value)}
+          placeholder="Gimnasio Usach, Santiago, Chile"
+          className="flex-1 rounded-full border border-border bg-surface px-4 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-brand focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={handleSearchAddress}
+          disabled={status === 'locating' || status === 'sending'}
+          className="rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-ink disabled:opacity-50"
+        >
+          Search
+        </button>
+      </div>
+
       {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
     </div>
   )
@@ -348,8 +403,10 @@ export function MerchantPanel({ merchantAddress }: MerchantPanelProps) {
           <p className="text-xs text-ink-muted">visits per day</p>
         </div>
         <div className="rounded-2xl border border-border bg-surface p-4">
-          <p className="text-xs uppercase tracking-wide text-ink-muted">Category</p>
-          <p className="mt-1 text-sm font-medium text-ink">{campaign.category}</p>
+          <p className="text-xs uppercase tracking-wide text-ink-muted">What you sell</p>
+          <p className="mt-1 text-sm font-medium text-ink">
+            {campaign.sells || 'Not set yet'}
+          </p>
         </div>
       </div>
 

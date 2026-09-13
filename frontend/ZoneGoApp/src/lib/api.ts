@@ -268,33 +268,59 @@ export async function fetchMyStanding(params: {
 }
 
 /**
- * Saves the merchant's real name/description to the backend, so /campaigns
- * and /search can show it instead of the generic "Merchant 0x..." fallback.
- * This endpoint doesn't exist on the API yet — calling it will 404 until
-* that endpoint gets built. That's expected: this call is
- * best-effort and never throws, so the local profile save (localStorage)
- * keeps working exactly as it does today regardless of whether the backend
- * call succeeds. Once the endpoint is live, campaigns will pick up the
- * real name automatically with no other change needed here.
+ * The exact text the merchant's wallet signs. It has to match the API's
+ * `api/profiles.py message()` character for character — change a space or a
+ * line and every save is refused with 401.
+ */
+export function merchantProfileMessage(p: {
+  wallet: string
+  name: string
+  description: string
+  issuedAt: number
+}): string {
+  return [
+    'ZoneGo merchant profile',
+    `Wallet: ${p.wallet.toLowerCase()}`,
+    `Name: ${p.name}`,
+    `Description: ${p.description}`,
+    `Issued at: ${p.issuedAt}`,
+  ].join('\n')
+}
+
+/**
+ * Saves the merchant's real name and description to the backend, so /campaigns
+ * and /search show it instead of "Merchant 0x...". The API only accepts it
+ * with a signature from the wallet it names — otherwise anyone could rename
+ * somebody else's store.
+ *
+ * Best-effort: never throws, so the local profile keeps working if this fails.
+ * But a refused save is logged, because fetch does not throw on a 401 or 422
+ * and a silent failure here means the store quietly keeps its address.
  */
 export async function saveMerchantProfileRemote(params: {
   wallet: string
   name: string
   description: string
+  issuedAt: number
+  signature: string
 }): Promise<void> {
   try {
     const url = new URL('/merchants/profile', API_BASE_URL)
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         wallet: params.wallet,
         name: params.name,
         description: params.description,
+        issued_at: params.issuedAt,
+        signature: params.signature,
       }),
     })
-  } catch {
-    // Best-effort — see docstring. Network errors or a 404 (endpoint not
-    // built yet) are both fine to swallow here.
+    if (!res.ok) {
+      console.warn('[ZoneGo] merchant profile not saved:', res.status, await res.text())
+    }
+  } catch (err) {
+    console.warn('[ZoneGo] merchant profile not saved:', err)
   }
 }
