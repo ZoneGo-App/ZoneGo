@@ -12,24 +12,24 @@ from features import FEATURES_ALL, add_sequential_features, fit_aggregated_featu
 
 logger = logging.getLogger("zonego.infer")
 
-# Todo se resuelve relativo a este mismo archivo -- no importa en qué
-# carpeta viva el proyecto (no se asume "ml/", "backend/", ni ningún otro
-# nombre). ZONEGO_MODEL_PATH permite apuntar a otro lado si hace falta.
+# Everything is resolved relative to this file -- it doesn't matter what
+# folder the project lives in (no assumption of "ml/", "backend/", or any
+# other name). ZONEGO_MODEL_PATH lets you point elsewhere if needed.
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_BUNDLE_PATH = os.environ.get("ZONEGO_MODEL_PATH", os.path.join(_BASE_DIR, "fraud_model.joblib"))
 
-# FIX (hallazgo del train.py con datos reales): los rasgos de grafo
-# (covisit_partners, sybil_score, wallet_farm_signal) describen el ESTADO
-# ACTUAL de la red de visitas -- no una generalización fija. Una billetera
-# Sybil siempre es nueva por diseño del ataque, así que una referencia
-# congelada en el momento del entrenamiento NUNCA la va a reconocer, sin
-# importar qué tan bueno sea el modelo. Verificado: recall de
-# repeated_nullifier caía de 100% a 0% con la referencia congelada.
-REFERENCE_TTL_SECONDS = int(os.environ.get("ZONEGO_REFERENCE_TTL_SECONDS", "1800"))  # 30 min por defecto
+# FIX (finding from running train.py on real data): the graph features
+# (covisit_partners, sybil_score, wallet_farm_signal) describe the CURRENT
+# state of the visit network -- not a fixed generalization. A Sybil wallet
+# is always new by the attack's design, so a reference frozen at training
+# time will NEVER recognize it in production, no matter how well trained
+# the model is. Verified: repeated_nullifier recall dropped from 100% to
+# 0% with the frozen reference.
+REFERENCE_TTL_SECONDS = int(os.environ.get("ZONEGO_REFERENCE_TTL_SECONDS", "1800"))  # 30 min by default
 
-# `events` y el cursor (`cursor_timestamp`/`cursor_id`) viven en el mismo
-# caché que la referencia fiteada -- ver _get_cached_snapshot() para el
-# porqué de cada campo.
+# `events` and the cursor (`cursor_timestamp`/`cursor_id`) live in the
+# same cache as the fitted reference -- see _get_cached_snapshot() for why
+# each field is there.
 _reference_cache = {
     "fitted": None,
     "events": None,
@@ -39,20 +39,20 @@ _reference_cache = {
     "cursor_id": "",
 }
 
-# FIX (reportado por el equipo, corrida real contra el subgraph): el
-# except amplio de abajo caía al fallback congelado con solo un print() --
-# invisible en cualquier setup de logs de producción real, justo en el
-# escenario donde Sybil se degrada de 100% a 0% de recall. Ahora se loguea
-# con logging.error() (nivel que sí se captura en la mayoría de configs) Y
-# se guarda en este dict, consultable desde afuera (ej. un endpoint de
-# healthcheck) sin tener que parsear logs.
+# FIX (reported by the team, real run against the subgraph): the broad
+# except below used to fall back to the frozen fallback with just a
+# print() -- invisible in any real production logging setup, right in the
+# exact scenario where Sybil detection degrades from 100% to 0% recall.
+# Now it's logged with logging.error() (a level that actually gets
+# captured in most configs) AND stored in this dict, queryable from the
+# outside (e.g. a healthcheck endpoint) without having to parse logs.
 _degraded_state = {"is_degraded": False, "since": None, "reason": None}
 
 
 def is_reference_degraded() -> dict:
-    """Devuelve el estado de degradación actual -- para un endpoint de
-    healthcheck o un dashboard, sin depender de que alguien esté mirando
-    los logs en el momento exacto en que el subgraph falló."""
+    """Returns the current degradation state -- for a healthcheck endpoint
+    or a dashboard, without depending on someone watching the logs at the
+    exact moment the subgraph failed."""
     return dict(_degraded_state)
 
 
@@ -83,40 +83,39 @@ def _mark_recovered() -> None:
 
 
 def _get_cached_snapshot(subgraph_url: str, bundle: dict, ttl_seconds: int = REFERENCE_TTL_SECONDS) -> dict:
-    """UNA sola función que trae del subgraph, cachea, y a la que TANTO
-    score_wallet() como el fiteo de la referencia recurren -- no hay
-    ningún otro lugar en este archivo que llame a load_events_from_subgraph().
+    """A SINGLE function that fetches from the subgraph, caches, and is
+    used by BOTH score_wallet() and the reference fitting step -- there is
+    no other place in this file that calls load_events_from_subgraph().
 
-    FIX #1 (reportado, corrida real): antes score_wallet() llamaba a
-    load_events_from_subgraph() directo y SIN protección para traer los
-    eventos de la wallet, y por separado _get_refreshed_reference() la
-    volvía a llamar si el caché estaba frío -- hasta DOS traídas completas
-    por request, y el detector de degradación (_degraded_state) solo vivía
-    en la segunda, así que la falla más común (la primera traída, sin try/
-    except, reventando antes de llegar a la segunda) nunca lo prendía.
-    Con una sola función protegida como único punto de entrada, ambos
-    problemas se resuelven a la vez: no puede haber una traída sin marcar
-    el estado, porque ya no existe ninguna traída fuera de acá.
+    FIX #1 (reported, real run): before, score_wallet() called
+    load_events_from_subgraph() directly and UNPROTECTED to fetch the
+    wallet's events, and separately _get_refreshed_reference() called it
+    AGAIN if the cache was cold -- up to TWO full fetches per request, and
+    the degradation detector (_degraded_state) only lived in the second
+    one, so the most common failure (the first fetch, with no try/except,
+    blowing up before ever reaching the second) never triggered it. With a
+    single protected function as the only entry point, both problems are
+    solved at once: there can be no fetch without marking the state,
+    because there is no longer any fetch outside of here.
 
-    FIX #2 (refresco incremental de verdad, no solo el nombre): cada
-    refresco pide `since_timestamp`/`since_id` = el cursor del refresco
-    anterior, no repite el historial completo. El cursor avanza al último
-    (timestamp, id) que trajo la traída incremental, y los eventos nuevos
-    se concatenan sobre el caché existente (deduplicados por `visit_id`
-    por si el borde exacto del cursor se repite). Con la cuota de Studio
-    en mente: una vez que el caché tiene algo, cada refresco de acá en
-    adelante paga solo por lo que pasó en los últimos `ttl_seconds`, sin
-    importar qué tan grande sea el historial total acumulado.
+    FIX #2 (real incremental refresh, not just the name): each refresh
+    asks for `since_timestamp`/`since_id` = the previous refresh's cursor,
+    instead of repeating the whole history. The cursor advances to the
+    last (timestamp, id) the incremental fetch brought back, and the new
+    events get concatenated onto the existing cache (deduplicated by
+    `visit_id` in case the exact cursor boundary repeats). With Studio's
+    quota in mind: once the cache has something, every refresh from here
+    on only pays for what happened in the last `ttl_seconds`, no matter
+    how large the total accumulated history is.
 
-    Orden de degradación si la traída incremental falla:
-      1. Si ya había un caché de este mismo subgraph, se sirve tal cual
-         (mejor que fallar la request por un tropiezo pasajero) y se marca
-         `is_degraded=True` igual, para que un healthcheck lo vea aunque
-         la request en curso haya salido bien.
-      2. Si no hay ningún caché todavía, se relanza la excepción -- que es
-         justo lo que score.py ya convierte en un 502 correcto -- pero
-         ahora SIEMPRE pasando antes por _mark_degraded(), a diferencia de
-         antes.
+    Degradation order if the incremental fetch fails:
+      1. If there was already a cache for this same subgraph, serve it as
+         is (better than failing the request over a transient hiccup) and
+         still mark `is_degraded=True`, so a healthcheck can see it even
+         if the current request went fine.
+      2. If there is no cache yet at all, re-raise the exception -- which
+         is exactly what score.py already turns into a proper 502 -- but
+         now ALWAYS going through _mark_degraded() first, unlike before.
     """
     now = time.monotonic()
     cache_is_fresh = (
@@ -220,10 +219,10 @@ def score_wallet(wallet: str, subgraph_url: str, bundle: dict = None) -> float |
     recent fraud score as a float in [0, 1], or None if it has no indexed
     visits yet.
 
-    Right now this will return None for basically any real wallet: the
-    deployed subgraph has zero indexed visits until the contracts get
-    redeployed (blocked on that, not on this code) — validate against
-    data/visits.csv (the synthetic set) in the meantime.
+    Right now this will return None for basically any real wallet: campaign
+    1 at Delancey is indexed and funded, but zero visits have landed yet
+    (waiting on Sebas to make the first one, not blocked on this code) —
+    validate against data/visits.csv (the synthetic set) in the meantime.
     """
     if bundle is None:
         bundle = load_bundle()
