@@ -182,7 +182,7 @@ for**, not a login button.
 `api/rp_signature.py` → World ID 4.0 request signing, pinned to World's vectors
 `api/world.py` → verification with World and the attestation the contract trusts
 `api/routers/world.py` → `/world/rp-context`, `/world/verify`, `/world/attestation`
-`frontend/ZoneGoApp/src/screens/IdentityCheck.tsx` → IDKit, on `feat/frontend-rebuild`
+`frontend/ZoneGoApp/src/screens/IdentityCheck.tsx` → IDKit
 `feedback/world.md` → our feedback
 
 </td><td width="33%" valign="top">
@@ -199,7 +199,7 @@ number in the US and Canada, where Privy's SMS reaches — gets a wallet, and is
 paid into it. A complete financial flow where **neither side knows there is a
 blockchain underneath.**
 
-All on branch `feat/frontend-rebuild`, under `frontend/ZoneGoApp/src/`:
+All under `frontend/ZoneGoApp/src/`:
 `main.tsx` → `PrivyProvider`, a wallet created for every user on login
 `screens/MerchantPanel.tsx` → `useSendTransaction`: approve USDC, fund the campaign
 `screens/ScanQr.tsx` → `useSignTypedData`: the merchant signs the visit
@@ -333,9 +333,10 @@ Honest, because a judge will find out anyway.
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
 | World ID 4.0 | Request signing live and pinned to World's own vectors; Selfie Check wired in the frontend |
 | Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |
-| Campaigns | Created and funded on chain from the frontend. **No visit has been claimed end to end yet** |
-| Fraud model | Trains and scores against the live subgraph on `feat/data-scientist`; not yet served by the API, which returns a placeholder score |
-| Epoch commitments | Built; none on chain yet, because there are no visits to score |
+| Campaigns | Created and funded on chain from the frontend |
+| Visits | **Two claimed end to end on Base Sepolia** — search, World verification, QR, merchant signature, USDC paid to the visitor's Privy wallet. [0x99eaccc…0c34](https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34) and [0x8520f58…8295](https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295) |
+| Fraud model | Trains and scores against the live subgraph; not yet served by the API, which returns a placeholder score |
+| Epoch commitments | Built and running hourly against the subgraph |
 | Store names | Signed by the merchant and kept by the API off chain — see the limits below |
 
 ### Deployed
@@ -364,6 +365,12 @@ and no other. The operator is the only address `commitEpoch` accepts. Both are
 immutable in the contracts — which means the trust in this system is a pair of
 addresses anybody can read, not a promise in a README.
 
+Both claims were relayed by `0xB3B3386d89200Dea2400FA0afFB5e03621cbDE02`, which
+paid the gas and decided nothing: the merchant's EIP-712 signature is what
+`VisitRegistry` recovers, and the USDC leaves the vault for the address inside
+that signature. Open either transaction and the payment goes to the visitor,
+not to the sender.
+
 **Subgraph**, live on Subgraph Studio:
 
 ```
@@ -390,9 +397,9 @@ address the contract trusts can be checked against the one actually signing.
 
 **Known and deliberate:** the fraud model trains on synthetic data, because a
 network with no visits has no fraud to learn from. `data_scientist/generate.py`
-on `feat/data-scientist` injects four patterns — impossible travel, visits out
+injects four patterns — impossible travel, visits out
 of hours, co-visiting wallets, and one nullifier behind many wallets — and
-`data_scientist/README.md` there reports how the model does against them. The
+`data_scientist/README.md` reports how the model does against them. The
 loader reads the subgraph with the same columns as the synthetic file, so real
 visits replace it without changing the pipeline. A weakness you name first
 stops being an attack and becomes rigour.
