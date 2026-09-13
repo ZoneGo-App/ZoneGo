@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { useRole } from './context/RoleContext'
+import { Header } from './components/Header'
 import { Onboarding } from './screens/Onboarding'
 import { Search } from './screens/Search'
 import { MyQr } from './screens/MyQr'
@@ -25,11 +26,12 @@ type NeighborTab = 'explore' | 'myqr' | 'panel' | 'ranking'
 /**
  * Reads a previously stored attestation, but only if it hasn't expired.
  * The attestation itself carries a TTL set server-side (originally 120s,
- * being extended by Lucio) — an expired one sitting in storage would just
- * fail on chain, so there is no point handing it back to the UI as if it
- * were still usable. Uses localStorage (not sessionStorage) so it survives
- * closing the tab or the app — the whole point of extending the TTL is that
- * daily use shouldn't keep re-triggering the selfie check.
+ * pending an extension from Lucio) — an expired one sitting in storage
+ * would just fail on chain, so there is no point handing it back to the UI
+ * as if it were still usable. Uses localStorage (not sessionStorage) so it
+ * survives closing the tab or the app — but as long as the server-side TTL
+ * stays at 120s, a refresh after that window will still ask again. That is
+ * expected until the TTL itself is extended, not a storage bug.
  */
 function readStoredAttestation(): WorldAttestation | null {
   const raw = localStorage.getItem(ATTESTATION_STORAGE_KEY)
@@ -67,29 +69,6 @@ function RoleFallback() {
           I'm a neighbor
         </button>
       </div>
-    </div>
-  )
-}
-
-function LogoutBar() {
-  const { logout } = usePrivy()
-  const { setRole } = useRole()
-
-  async function handleLogout() {
-    setRole(null)
-    localStorage.removeItem(ATTESTATION_STORAGE_KEY)
-    await logout()
-  }
-
-  return (
-    <div className="flex justify-end bg-bg px-4 pt-4">
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="text-sm text-ink-muted underline"
-      >
-        Log out
-      </button>
     </div>
   )
 }
@@ -169,11 +148,29 @@ function BottomNav({ activeTab, onSelect }: { activeTab: NeighborTab; onSelect: 
   )
 }
 
-function MyPanelComingSoon() {
+function MyPanelPlaceholder() {
+  const { logout } = usePrivy()
+  const { setRole } = useRole()
+
+  async function handleLogout() {
+    setRole(null)
+    localStorage.removeItem(ATTESTATION_STORAGE_KEY)
+    await logout()
+  }
+
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 px-6 text-center">
-      <p className="text-ink">Your earnings panel isn't ready yet.</p>
-      <p className="text-sm text-ink-muted">Check back soon — this is coming.</p>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-6 text-center">
+      <div>
+        <p className="text-ink">Your earnings panel isn't ready yet.</p>
+        <p className="text-sm text-ink-muted">Check back soon — this is coming.</p>
+      </div>
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="rounded-full border border-border px-6 py-2 text-sm font-medium text-ink-muted"
+      >
+        Log out
+      </button>
     </div>
   )
 }
@@ -193,9 +190,6 @@ function App() {
   const merchantAddress = import.meta.env.VITE_DEV_MERCHANT_ADDRESS || user?.wallet?.address || ''
   const visitorAddress = user?.wallet?.address
 
-  // Re-check localStorage for a saved profile whenever the relevant wallet
-  // address becomes available — it isn't known yet on the very first render,
-  // right after Privy finishes authenticating.
   useEffect(() => {
     if (role === 'comercio' && merchantAddress) {
       setMerchantProfile(readMerchantProfile(merchantAddress))
@@ -235,18 +229,18 @@ function App() {
     return <Onboarding />
   }
 
+  if (!role) {
+    return <RoleFallback />
+  }
+
   let content: React.ReactNode
 
-  if (!role) {
-    content = <RoleFallback />
-  } else if (role === 'comercio') {
+  if (role === 'comercio') {
     if (!merchantAddress) {
       content = (
-        <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-center">
-          <p className="text-red-600">
-            No wallet found for your account yet. Try signing out and back in.
-          </p>
-        </div>
+        <p className="px-6 pt-10 text-center text-red-600">
+          No wallet found for your account yet. Try signing out and back in.
+        </p>
       )
     } else if (!merchantProfile) {
       content = (
@@ -255,6 +249,7 @@ function App() {
     } else {
       // Merchant side — unchanged: panel + scan, no bottom nav (doesn't map
       // cleanly onto a role that scans QRs rather than showing its own).
+      // MerchantPanel now carries its own "Log out" next to "Business account".
       content =
         merchantView === 'scan' ? (
           <ScanQr />
@@ -262,68 +257,61 @@ function App() {
           <MerchantPanel merchantAddress={merchantAddress} onGoToScan={() => setMerchantView('scan')} />
         )
     }
+  } else if (!visitorAddress) {
+    content = (
+      <p className="px-6 pt-10 text-center text-red-600">
+        No wallet found for your account yet. Try signing out and back in.
+      </p>
+    )
+  } else if (!attestation) {
+    content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
+  } else if (!visitorProfile) {
+    content = <VisitorProfileForm visitorAddress={visitorAddress} onComplete={setVisitorProfile} />
   } else {
-    // Neighbor side.
-    if (!visitorAddress) {
-      content = (
-        <div className="flex min-h-screen items-center justify-center bg-bg px-6 text-center">
-          <p className="text-red-600">
-            No wallet found for your account yet. Try signing out and back in.
-          </p>
+    let tabContent: React.ReactNode
+
+    if (neighborTab === 'myqr' && selectedHit) {
+      tabContent = (
+        <MyQr
+          visitorAddress={visitorAddress}
+          campaign={selectedHit.campaign}
+          attestation={attestation}
+          onBack={handleBackFromQr}
+        />
+      )
+    } else if (neighborTab === 'myqr') {
+      tabContent = (
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 px-6 text-center">
+          <p className="text-ink">No active QR yet.</p>
+          <p className="text-sm text-ink-muted">Search for a place and pick one to get your code.</p>
+          <button
+            type="button"
+            onClick={() => setNeighborTab('explore')}
+            className="mt-2 rounded-full bg-brand px-6 py-2 text-sm font-medium text-white"
+          >
+            Explore nearby
+          </button>
         </div>
       )
-    } else if (!attestation) {
-      content = <IdentityCheck visitorAddress={visitorAddress} onVerified={setAttestation} />
-    } else if (!visitorProfile) {
-      content = (
-        <VisitorProfileForm visitorAddress={visitorAddress} onComplete={setVisitorProfile} />
-      )
+    } else if (neighborTab === 'panel') {
+      tabContent = <MyPanelPlaceholder />
+    } else if (neighborTab === 'ranking') {
+      tabContent = <Leaderboard myAddress={visitorAddress} />
     } else {
-      let tabContent: React.ReactNode
-
-      if (neighborTab === 'myqr' && selectedHit) {
-        tabContent = (
-          <MyQr
-            visitorAddress={visitorAddress}
-            campaign={selectedHit.campaign}
-            attestation={attestation}
-            onBack={handleBackFromQr}
-          />
-        )
-      } else if (neighborTab === 'myqr') {
-        tabContent = (
-          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 px-6 text-center">
-            <p className="text-ink">No active QR yet.</p>
-            <p className="text-sm text-ink-muted">Search for a place and pick one to get your code.</p>
-            <button
-              type="button"
-              onClick={() => setNeighborTab('explore')}
-              className="mt-2 rounded-full bg-brand px-6 py-2 text-sm font-medium text-white"
-            >
-              Explore nearby
-            </button>
-          </div>
-        )
-      } else if (neighborTab === 'panel') {
-        tabContent = <MyPanelComingSoon />
-      } else if (neighborTab === 'ranking') {
-        tabContent = <Leaderboard myAddress={visitorAddress} />
-      } else {
-        tabContent = <Search onSelectCampaign={handleSelectCampaign} />
-      }
-
-      content = (
-        <div className="pb-20">
-          {tabContent}
-          <BottomNav activeTab={neighborTab} onSelect={setNeighborTab} />
-        </div>
-      )
+      tabContent = <Search onSelectCampaign={handleSelectCampaign} />
     }
+
+    content = (
+      <div className="pb-20">
+        {tabContent}
+        <BottomNav activeTab={neighborTab} onSelect={setNeighborTab} />
+      </div>
+    )
   }
 
   return (
     <>
-      <LogoutBar />
+      <Header />
       {content}
     </>
   )

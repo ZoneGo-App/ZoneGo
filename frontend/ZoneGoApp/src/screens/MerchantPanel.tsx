@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useSendTransaction } from '@privy-io/react-auth'
+import { usePrivy, useSendTransaction } from '@privy-io/react-auth'
 import { fetchCampaigns, formatUsd, type Campaign } from '../lib/api'
+import { useRole } from '../context/RoleContext'
 
 interface MerchantPanelProps {
   merchantAddress: string
@@ -115,6 +116,14 @@ function SeedCampaignButton({ merchantAddress }: { merchantAddress: string }) {
 }
 
 export function MerchantPanel({ merchantAddress, onGoToScan }: MerchantPanelProps) {
+  const { logout } = usePrivy()
+  const { setRole } = useRole()
+
+  async function handleLogout() {
+    setRole(null)
+    await logout()
+  }
+
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -174,7 +183,12 @@ export function MerchantPanel({ merchantAddress, onGoToScan }: MerchantPanelProp
 
   return (
     <div className="min-h-screen bg-bg px-4 py-6">
-      <p className="text-xs uppercase tracking-wide text-ink-muted">Business account</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs uppercase tracking-wide text-ink-muted">Business account</p>
+        <button type="button" onClick={handleLogout} className="text-xs text-ink-muted underline">
+          Log out
+        </button>
+      </div>
       <h1 className="text-2xl font-bold text-ink">{campaign.merchant_name}</h1>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
