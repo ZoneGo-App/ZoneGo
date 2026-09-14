@@ -139,8 +139,8 @@ def apply_aggregated_features(df: pd.DataFrame, fitted: dict) -> pd.DataFrame:
     )
     df.loc[~df['wallet'].isin(known_wallets), 'business_entropy'] = neutral_entropy
 
-    # Combine World's Sybil signal with the subgraph co-visit signal
-    # ("Combinarla con los rasgos de co-visita del subgraph"). Each alone
+    # Combine World's Sybil signal with the subgraph co-visit signal, as the
+    # plan asked. Each alone
     # can have an innocent explanation on its own -- a shared nullifier
     # could just be a device/account-recovery edge case, and a co-visit
     # cluster could be a family or a line at a popular register. A wallet

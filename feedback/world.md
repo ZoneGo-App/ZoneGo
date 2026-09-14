@@ -88,9 +88,13 @@ was our own (`not a valid 32-byte key`), and it took comparing key lengths to
 find. Stating the exact expected format — `0x` followed by 64 hex characters —
 next to wherever the portal displays the key would shorten that.
 
-> _TODO (Lucio): what the Developer Portal showed when creating the
-> `verify-visitor` action, and anything that was hard to find while setting up
-> the app and its RP id._
+**Which phone app to test with was the slowest thing to learn.** Creating the
+`verify-visitor` action and copying the app id and RP id out of the portal was
+quick. What the portal did not answer was what to install on the phone that
+would do the verifying: we were pointed at World App, a download of roughly
+540 MB, before it was clear that Selfie Check runs in the production app rather
+than the Sandbox App. One line beside the action — "test this with World App,
+production environment" — would have saved that detour.
 
 
 ## 3. Proof flows, errors and edge cases
@@ -181,6 +185,26 @@ days. What that meant for our design:
 The honest limit: we measure the window from the last visit, not from the
 moment of verification, because we keep no record of the second and the chain
 keeps the first. That errs toward asking for a selfie sooner, never later.
+
+
+## What happened in production
+
+Before the submission deadline, the first two visits were claimed and paid on Base Sepolia:
+
+- https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295
+- https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34
+
+Each claim reached `VisitRegistry` carrying an attestation signed by the address
+the contract trusts, and that attester only signs after World's verify endpoint
+answers success — so the first of them could not have succeeded without a real
+Selfie Check verified by World. Both carry the same nullifier,
+`0x2921592c…06606fa`, which the contract has now bound to that one wallet: the
+same person claiming from any other wallet is rejected on chain.
+
+The attestation is burned on use, so the second claim, two minutes later, needed
+a fresh one. That is the case `GET /world/attestation/{visitor}` exists for: once
+the nullifier is bound on chain, the API can sign again for that wallet without
+asking for another selfie.
 
 
 ## What worked well

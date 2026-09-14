@@ -14,6 +14,24 @@ verified with World ID, settled in USDC on Base, in the same second.
 
 ---
 
+## Live
+
+| | |
+|---|---|
+| **The app** | **[zone-go.vercel.app](https://zone-go.vercel.app)** — opens on Delancey Street, where campaigns are live. "Use my location" switches to your GPS |
+| API, interactive | [zonego-api.onrender.com/docs](https://zonego-api.onrender.com/docs) |
+| Subgraph | [zone-go/v0.0.2](https://api.studio.thegraph.com/query/1758817/zone-go/v0.0.2) |
+
+**Paid on Base Sepolia before the submission deadline:** the first two visits,
+[campaign 6](https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295)
+and [campaign 5](https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34),
+0.05 USDC each. Both carry the same World nullifier, now bound to that wallet on
+chain, and the subgraph counted them as two new stores, 20 points. The hourly
+job then committed that epoch's root to `FraudOracle`:
+[epoch 497031](https://sepolia.basescan.org/tx/0xa722ff84dc0b818f8b8f989efd74471a4fd643704e88aee312cd0fe0586ab5c9).
+
+---
+
 ## See it in sixty seconds
 
 ```bash
@@ -113,10 +131,16 @@ Three parties who do not trust each other, coordinating only through code.
 payout. The contract pays inside `claim()`, before any score exists, and
 `VisitRegistry` never consults `FraudOracle`. The model scores visits after the
 fact, off chain, and the API commits scores per epoch as a Merkle root — but the
-score the API serves today is a deterministic placeholder, not the trained
-model, and no epoch has been committed because there are no visits to score.
-Holding a payout until its score clears is the next contract change, not a
-feature of this one.
+score inside that root is still the API's deterministic placeholder, not the
+trained model. Holding a payout until its score clears is the next contract
+change, not a feature of this one.
+
+The model did see the first real visits. Run against the live subgraph, it
+scored that wallet **0.977**, above its 0.83 threshold: the two claims were our
+own test, 666 metres apart and 118 seconds apart — about 20 km/h, faster than
+anyone walks. Both were paid anyway, which is exactly the gap described above.
+Anyone can reproduce the score from `data_scientist/` with
+`python infer.py <subgraph-url> <wallet>`.
 
 ---
 
@@ -132,7 +156,7 @@ meets them:
 | Claiming twice in a day | A second visit to the same store on the same day scores no points, and pays less — the weekly decay counts it like any other visit |
 | A photographed QR, reused | Single-use nonce, signature dead after 90 seconds |
 | Draining a campaign at once | Daily cap on visits, set by the merchant when creating the campaign |
-| A fraud score nobody can audit | Built to commit each epoch's scores on chain as a **Merkle root** to `FraudOracle`, so one cannot be rewritten afterwards. No epoch is committed yet — see *What is not wired yet* above |
+| A fraud score nobody can audit | Each epoch's scores are committed on chain as a **Merkle root** to `FraudOracle`, so one cannot be rewritten afterwards. The first is on chain — epoch 497031 — though the scores in it are still the placeholder; see *What is not wired yet* above |
 
 ---
 
@@ -244,7 +268,10 @@ api/          FastAPI — search, QR signing, relay, scoring, leaderboard
 subgraph/     The Graph — schema, ABIs, manifest, AssemblyScript mappings
 schema/       the event contract agreed between all four roles
 feedback/     sponsor feedback documents
-contracts/    Solidity — on branch feat/contracts-skeleton
+contracts/    Solidity — vault, registry, oracle, Foundry tests and deploy scripts
+frontend/     React + Vite app, Privy wallets, World IDKit, Leaflet map
+data_scientist/  fraud model: synthetic generator, graph features, training, inference
+plan/         the nine-day execution plan, as written on day four
 ```
 
 ### Running it
@@ -329,14 +356,14 @@ Honest, because a judge will find out anyway.
 
 | | |
 |---|---|
-| API — 20 endpoints, **298 tests** | **Live** at `zonego-api.onrender.com` |
+| API — 20 endpoints, **302 tests** | **Live** at `zonego-api.onrender.com` |
 | Subgraph — 10 entities across three contracts | **Deployed and answering** |
 | World ID 4.0 | Request signing live and pinned to World's own vectors; Selfie Check wired in the frontend |
 | Contracts — vault, registry, oracle | **Deployed, and the version on chain is the one in this repository** |
 | Campaigns | Created and funded on chain from the frontend |
-| Visits | **Two claimed end to end on Base Sepolia** — search, World verification, QR, merchant signature, USDC paid to the visitor's Privy wallet. [0x99eaccc…0c34](https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34) and [0x8520f58…8295](https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295) |
-| Fraud model | Trains and scores against the live subgraph; not yet served by the API, which returns a placeholder score |
-| Epoch commitments | Built and running hourly against the subgraph |
+| Visits | **Claimed end to end on Base Sepolia — the first two before the submission deadline** — search, World verification, QR, merchant signature, USDC paid to the visitor's Privy wallet. [0x99eaccc…0c34](https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34) and [0x8520f58…8295](https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295) |
+| Fraud model | Trains, and scores against the live subgraph — it flagged the first real visitor at 0.977. Not yet served by the API, which returns a placeholder score |
+| Epoch commitments | Running hourly. First root on chain, epoch 497031, and `/epochs/{epoch}` reports it as committed. Its scores are the placeholder |
 | Store names | Signed by the merchant and kept by the API off chain — see the limits below |
 
 ### Deployed

@@ -1,8 +1,7 @@
 # Feedback for Privy
 
 Everything below comes from building ZoneGo, and points at the code it refers
-to. The frontend lives on branch `feat/frontend-rebuild`, under
-`frontend/ZoneGoApp/src/`.
+to. The frontend lives under `frontend/ZoneGoApp/src/`.
 
 ## What we integrated
 
@@ -90,10 +89,13 @@ signs the visit from that same wallet. The neighbour signs in, walks, and is
 paid into a wallet they never saw being made. Neither side meets a seed phrase,
 a gas fee or the word "blockchain".
 
-Where that stands today: approving and funding are done on chain — the live
-campaigns were funded this way. The merchant's signature and the payout into
-the neighbour's wallet are built and wired, but no visit has been claimed end
-to end yet.
+Where that stands: all of it has run on chain. The live campaigns were approved
+and funded from embedded wallets, and before the submission deadline two visits were claimed
+through the app — the merchant signing each one from their embedded wallet, the
+neighbour paid 0.05 USDC per visit into theirs, without holding gas:
+
+- https://sepolia.basescan.org/tx/0x8520f584c7581bc13193f44f3e11b1bf248a13edd71c1e37946ad01e5b9a8295
+- https://sepolia.basescan.org/tx/0x99eacccae413246d43a3817b5dd3140d38a981d4a62f20378cd86db841660c34
 
 ---
 
