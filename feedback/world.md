@@ -119,10 +119,25 @@ first: a QR code that opened the app store instead of the Sandbox App (their
 workaround was prefixing the link with `sandbox`), and several teams unable to
 complete Selfie Check at all who fell back to the simulator.
 
-> _TODO (Sebastián, David): Sandbox App states you saw while testing, how test
-> users were set up, and any proof that failed in a way the error did not
-> explain. This is the part the prize asks about most directly, and it is
-> yours — you wired IDKit._
+**We never used the Sandbox App ourselves, and that is the finding.** The prize
+asks about it, so the honest answer comes first: Selfie Check is not available
+there. We built against the production app instead, on a World team member's
+word in Discord that Selfie Check was already enabled for every hackathon team,
+with no per-App-ID flag needed. That is the opposite of what the documentation
+led us to expect, and it cost us two days of a nine-day event.
+
+The sequence: we requested access and understood, from the documentation, that
+approval would arrive by email at the address we had registered. No email came.
+We waited, assuming a queue. The answer arrived days later on Discord — there
+was nothing to wait for. Two days of four people's time went to a message that
+was never going to be sent.
+
+The fix is not more documentation. It is one sentence on the access page saying
+whether an email is coming, and whether Selfie Check works in the Sandbox App at
+all. Both questions are answerable in a line, and neither is answered anywhere
+we looked. Because we never reached the Sandbox App, we have nothing to report
+about its states or its test users — which is itself the answer to that part of
+the question.
 
 
 ## 4. What was confusing, missing, broken, or hard to test
@@ -183,9 +198,24 @@ keeps the first. That errs toward asking for a selfie sooner, never later.
 
 ## User feedback
 
-> _TODO (team): from real test sessions — how the Selfie Check felt, where
-> someone hesitated, and how long it took in seconds from opening the widget to
-> a verified result._
+**Selfie Check is usually fast, and sometimes it is not.** Across many runs
+during development — our attestation initially lasted two minutes, so every
+test meant another selfie — most completed in a few seconds. Some took long
+enough that we started checking whether the widget had frozen. We did not
+instrument it, so we are not going to invent a number, but the spread was wide
+enough to be felt rather than measured.
+
+That variance changed the product. We had verification sitting on the path of
+every visit, which meant a slow check could make a payment look broken at the
+counter. It now lasts fifteen days from the visitor's last visit, and
+`GET /world/attestation/{visitor}` reissues an attestation for a human the
+chain has already bound, without asking for another selfie. The decision came
+from the friction, not from a requirement.
+
+**What this means for the documentation.** Publishing an expected range, even a
+rough one, would let teams design around it deliberately instead of discovering
+it the way we did. Right now everyone is guessing, and the ones who guess wrong
+put a variable-latency step in the middle of a payment.
 
 ---
 
