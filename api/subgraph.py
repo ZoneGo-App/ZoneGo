@@ -71,6 +71,17 @@ query VisitorStanding($id: Bytes!) {
 }
 """
 
+# The root FraudOracle accepted for one epoch, as the index recorded it from
+# EpochCommitted. The contract keeps only its latest root, so once a newer epoch
+# is committed the event is the only place an older one can still be read.
+COMMITTED_ROOT = """
+query CommittedRoot($epoch: BigInt!) {
+  epoches(first: 1, where: { epoch: $epoch }) {
+    merkleRoot
+  }
+}
+"""
+
 # Everyone who was seen inside one epoch. Ordered by timestamp so the page we
 # take is the earliest slice of the window rather than an arbitrary one — an
 # epoch has to be rebuildable to the same root by anyone who asks.
@@ -173,6 +184,12 @@ def to_campaign(node: dict[str, Any]) -> Campaign:
 def list_campaigns(first: int = 100) -> list[Campaign]:
     data = run(LIST_CAMPAIGNS, {"first": first})
     return [to_campaign(node) for node in data.get("campaigns", [])]
+
+
+def committed_root(epoch: int) -> str | None:
+    """The root committed on chain for an epoch, or None if none was."""
+    rows = run(COMMITTED_ROOT, {"epoch": str(epoch)}).get("epoches") or []
+    return rows[0]["merkleRoot"] if rows else None
 
 
 def visitor_standing(visitor: str) -> tuple[str, int] | None:

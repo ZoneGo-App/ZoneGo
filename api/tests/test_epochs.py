@@ -141,9 +141,9 @@ def test_a_closed_epoch_returns_its_root():
     assert body["wallets"] == len(MOCK_EXPLORERS)
 
 
-def test_a_root_is_not_claimed_to_be_on_chain():
-    """commitEpoch is still `revert("not implemented")`. Saying otherwise here
-    would be the one lie this endpoint exists to prevent."""
+def test_a_sample_root_is_not_claimed_to_be_on_chain():
+    """Mock mode has no chain. Saying a sample root was committed would be the
+    one lie this field exists to prevent."""
     assert client.get(f"/epochs/{closed()}").json()["committed"] is False
 
 
@@ -199,3 +199,55 @@ def test_a_live_epoch_is_built_from_the_indexed_visitors(live, monkeypatch):
     body = client.get(f"/epochs/{closed()}").json()
     # The same wallet twice in one window is one leaf, not two.
     assert body["wallets"] == 2
+
+
+# --- whether the root is really on chain ------------------------------------
+#
+# The field read false for the first epoch FraudOracle ever accepted, because
+# nothing set it. It is now read from the EpochCommitted the index recorded.
+
+
+def index_with(monkeypatch, *, visitors, committed_root=None, commit_lookup_fails=False):
+    """Visits for the build, and a separate answer for the commit lookup."""
+
+    def fake_post(url, **kwargs):
+        query = kwargs["json"]["query"]
+        if "CommittedRoot" in query:
+            if commit_lookup_fails:
+                payload = {"errors": [{"message": "store not indexed"}]}
+            else:
+                rows = [{"merkleRoot": committed_root}] if committed_root else []
+                payload = {"data": {"epoches": rows}}
+        else:
+            payload = visits_of(*visitors)
+        return httpx.Response(200, json=payload, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+
+def test_a_root_the_oracle_accepted_reads_as_committed(live, monkeypatch):
+    index_with(monkeypatch, visitors=[WALLET])
+    root = client.get(f"/epochs/{closed()}").json()["root"]
+
+    subgraph.clear_cache()
+    index_with(monkeypatch, visitors=[WALLET], committed_root=root)
+    assert client.get(f"/epochs/{closed()}").json()["committed"] is True
+
+
+def test_an_epoch_nobody_committed_reads_as_not_committed(live, monkeypatch):
+    index_with(monkeypatch, visitors=[WALLET])
+    assert client.get(f"/epochs/{closed()}").json()["committed"] is False
+
+
+def test_a_different_root_on_chain_is_not_this_commitment(live, monkeypatch):
+    """What the visits rebuild to today must be what was committed, byte for byte."""
+    index_with(monkeypatch, visitors=[WALLET], committed_root="0x" + "ee" * 32)
+    assert client.get(f"/epochs/{closed()}").json()["committed"] is False
+
+
+def test_an_unreadable_commit_is_not_claimed(live, monkeypatch):
+    """The root still comes back; only the claim that it is on chain is withheld."""
+    index_with(monkeypatch, visitors=[WALLET], commit_lookup_fails=True)
+    response = client.get(f"/epochs/{closed()}")
+    assert response.status_code == 200
+    assert response.json()["committed"] is False

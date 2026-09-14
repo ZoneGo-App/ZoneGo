@@ -18,6 +18,7 @@ import time
 from fastapi import APIRouter, HTTPException, Path, Query
 
 from api import epochs, merkle, subgraph
+from api.config import get_config
 from api.schemas import EpochCommitment, EpochWindow, ScoreProof
 
 router = APIRouter(prefix="/epochs", tags=["epochs"])
@@ -62,7 +63,29 @@ def commitment(epoch: int = Path(..., ge=0)):
         end=found.end,
         root=found.root,
         wallets=found.wallets,
+        committed=_on_chain(found.epoch, found.root),
     )
+
+
+def _on_chain(epoch: int, root: str) -> bool:
+    """Whether FraudOracle holds this exact root for this epoch.
+
+    `committed` was never set, so it read false even after the hourly job had
+    published a root — telling anyone who checked that the audit trail did not
+    exist when it did. It is now read from the EpochCommitted the index
+    recorded, and it has to be the same root: one committed for this epoch that
+    differs from what the visits rebuild to today is not this commitment.
+
+    Unreadable is false. The field promises a root anyone can check on chain,
+    and a root we could not confirm is not one.
+    """
+    if get_config().mock_mode:
+        return False
+    try:
+        on_chain = subgraph.committed_root(epoch)
+    except subgraph.SubgraphError:
+        return False
+    return on_chain is not None and on_chain.lower() == root.lower()
 
 
 @router.get("/{epoch}/proof", response_model=ScoreProof)
